@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run basic tests
+      run: |
+        chmod +x silk tests/test_basic.sh
+        ./tests/test_basic.sh
+    
+    - name: Test installation
+      run: |
+        chmod +x install.sh
+        # Test dry run sans install réelle
+        INSTALL_DIR=/tmp/silk-test ./install.sh
+        /tmp/silk-test/silk --version
+
+  compatibility:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Test basic functionality
+      shell: bash
+      run: |
+        chmod +x silk
+        ./silk --version
+        ./silk --help
