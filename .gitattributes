@@ -1,0 +1,31 @@
+# .gitattributes pour SILK CLI
+# Évite les problèmes de fins de ligne cross-platform
+
+# Scripts bash : toujours LF
+*.sh text eol=lf
+silk text eol=lf
+
+# Scripts d'installation
+install.sh text eol=lf
+install-*.sh text eol=lf
+
+# Fichiers markdown
+*.md text eol=lf
+
+# Fichiers YAML (templates)
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Configuration
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Fichiers binaires
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+
+# Archives
+*.tar.gz binary
+*.zip binary

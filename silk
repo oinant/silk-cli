@@ -7,11 +7,70 @@
 
 set -euo pipefail
 
+# === FIX COMPATIBILITÉ WINDOWS/WSL ===
+# Convertir fins de ligne si nécessaire (Windows/WSL)
+if command -v dos2unix &> /dev/null && [[ -f "$0" ]]; then
+    # Vérifier si le script a des CRLF et les convertir silencieusement
+    if file "$0" 2>/dev/null | grep -q "CRLF"; then
+        dos2unix "$0" 2>/dev/null || true
+    fi
+fi
+
+# Détecter l'environnement d'exécution
+detect_environment() {
+    if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+        echo "wsl"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "mingw"* ]]; then
+        echo "gitbash"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "linux"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    else
+        echo "unknown"
+    fi
+}
+
+SILK_ENV=$(detect_environment)
+
 # === CONFIGURATION GLOBALE ===
 SILK_VERSION="1.0.0"
 SILK_HOME="${SILK_HOME:-$HOME/.silk}"
 SILK_CONFIG="$SILK_HOME/config"
+SILK_LIB_DIR="${SILK_LIB_DIR:-$(dirname "${BASH_SOURCE[0]}")/lib}"
 VAULT_MARKER="## manuscrit"
+
+# === DÉTECTION ARCHITECTURE ===
+# Si lib/ existe en local, utiliser version locale
+if [[ -d "$(dirname "${BASH_SOURCE[0]}")/lib" ]]; then
+    SILK_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")/lib"
+# Sinon utiliser installation système
+elif [[ -d "/usr/local/lib/silk" ]]; then
+    SILK_LIB_DIR="/usr/local/lib/silk"
+elif [[ -d "$HOME/.silk/lib" ]]; then
+    SILK_LIB_DIR="$HOME/.silk/lib"
+fi
+
+# === CHARGEMENT MODULES ===
+# Fonction de chargement sécurisé
+load_module() {
+    local module="$1"
+    local module_path="$SILK_LIB_DIR/$module"
+    
+    if [[ -f "$module_path" ]]; then
+        source "$module_path"
+        return 0
+    else
+        echo "❌ Module SILK manquant: $module" >&2
+        echo "💡 Répertoire attendu: $SILK_LIB_DIR" >&2
+        return 1
+    fi
+}
+
+# Charger modules core
+load_module "core/utils.sh" || exit 1
+load_module "core/config.sh" || exit 1
+load_module "core/vault.sh" || exit 1
 
 # === COULEURS ===
 if [[ -t 1 ]]; then
@@ -21,1462 +80,174 @@ if [[ -t 1 ]]; then
     BLUE='\033[0;34m'
     PURPLE='\033[0;35m'
     CYAN='\033[0;36m'
-    NC='\033[0m' # No Color
+    NC='\033[0m'
 else
     RED='' GREEN='' YELLOW='' BLUE='' PURPLE='' CYAN='' NC=''
 fi
 
-# === FONCTIONS UTILITAIRES ===
+# === FONCTIONS UTILITAIRES DE BASE ===
 log_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
 log_success() { echo -e "${GREEN}✅ $1${NC}"; }
 log_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 log_error() { echo -e "${RED}❌ $1${NC}"; }
 log_header() { echo -e "${PURPLE}🕷️  $1${NC}"; }
 
-detect_os() {
-    case "$OSTYPE" in
-        msys*|cygwin*|mingw*) echo "windows" ;;
-        darwin*) echo "macos" ;;
-        linux*) echo "linux" ;;
-        *) echo "unknown" ;;
-    esac
-}
+# === AIDE GÉNÉRALE ===
+show_help() {
+    cat << EOF
+$(log_header "SILK v$SILK_VERSION - Smart Integrated Literary Kit")
+${CYAN}Structured Intelligence for Literary Kreation${NC}
 
-is_silk_project() {
-    [[ -d "01-Manuscrit" && -d "02-Personnages" && -d "04-Concepts" ]]
-}
-
-find_silk_root() {
-    local current_dir="$PWD"
-    while [[ "$current_dir" != "/" ]]; do
-        if [[ -d "$current_dir/01-Manuscrit" ]]; then
-            echo "$current_dir"
-            return 0
-        fi
-        current_dir="$(dirname "$current_dir")"
-    done
-    return 1
-}
-
-ensure_silk_context() {
-    if ! is_silk_project; then
-        local silk_root
-        if silk_root=$(find_silk_root); then
-            log_info "Projet SILK trouvé dans: $silk_root"
-            cd "$silk_root"
-        else
-            log_error "Pas dans un projet SILK. Utilisez 'silk init' pour créer un projet."
-            exit 1
-        fi
-    fi
-}
-
-# === GESTION CONFIGURATION ===
-load_config() {
-    mkdir -p "$SILK_HOME"
-    if [[ -f "$SILK_CONFIG" ]]; then
-        source "$SILK_CONFIG"
-    fi
-    
-    # Valeurs par défaut
-    SILK_DEFAULT_GENRE="${SILK_DEFAULT_GENRE:-polar-psychologique}"
-    SILK_DEFAULT_LANGUAGE="${SILK_DEFAULT_LANGUAGE:-fr}"
-    SILK_DEFAULT_TARGET_WORDS="${SILK_DEFAULT_TARGET_WORDS:-80000}"
-    SILK_DEFAULT_CHAPTERS="${SILK_DEFAULT_CHAPTERS:-30}"
-    SILK_DEFAULT_FORMAT="${SILK_DEFAULT_FORMAT:-digital}"
-    SILK_AUTHOR_NAME="${SILK_AUTHOR_NAME:-}"
-    SILK_AUTHOR_PSEUDO="${SILK_AUTHOR_PSEUDO:-}"
-}
-
-save_config() {
-    cat > "$SILK_CONFIG" << EOF
-# SILK Configuration - Smart Integrated Literary Kit
-SILK_DEFAULT_GENRE="${SILK_DEFAULT_GENRE:-polar-psychologique}"
-SILK_DEFAULT_LANGUAGE="${SILK_DEFAULT_LANGUAGE:-fr}"
-SILK_DEFAULT_TARGET_WORDS="${SILK_DEFAULT_TARGET_WORDS:-80000}"
-SILK_DEFAULT_CHAPTERS="${SILK_DEFAULT_CHAPTERS:-30}"
-SILK_DEFAULT_FORMAT="${SILK_DEFAULT_FORMAT:-digital}"
-SILK_AUTHOR_NAME="${SILK_AUTHOR_NAME:-}"
-SILK_AUTHOR_PSEUDO="${SILK_AUTHOR_PSEUDO:-}"
-EOF
-}
-
-# === COMMANDE INIT ===
-cmd_init() {
-    local project_name=""
-    local genre="$SILK_DEFAULT_GENRE"
-    local language="$SILK_DEFAULT_LANGUAGE"
-    local target_words="$SILK_DEFAULT_TARGET_WORDS"
-    local target_chapters="$SILK_DEFAULT_CHAPTERS"
-    local author_name="$SILK_AUTHOR_NAME"
-    local author_pseudo="$SILK_AUTHOR_PSEUDO"
-    local interactive=true
-    
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                cat << 'HELP'
-🕷️ SILK INIT - Créer un nouveau projet littéraire
+Modern CLI workflow for authors with LLM integration
 
 USAGE:
-  silk init [PROJECT_NAME] [OPTIONS]
+  silk COMMAND [OPTIONS]
 
-OPTIONS:
-  -g, --genre GENRE          Genre du projet 
-  -l, --language LANG        Langue (fr, en, es, de)
-  -w, --words NUMBER         Objectif mots (défaut: 80000)
-  -c, --chapters NUMBER      Nombre de chapitres (défaut: 30)
-  -a, --author NAME          Nom auteur
-  -p, --pseudo PSEUDO        Pseudonyme auteur
-  -y, --yes                  Mode non-interactif
-  -h, --help                 Afficher cette aide
+CORE COMMANDS:
+  init        Créer un nouveau projet littéraire
+  context     Générer contexte optimisé pour LLM 
+  wordcount   Statistiques progression manuscrit
+  publish     Générer PDF professionnel multi-format
+  config      Configuration globale SILK
+  version     Afficher version
 
-EXEMPLES:
-  silk init "L'Araignée"                         # Mode interactif
-  silk init "Dark Mystery" --genre fantasy       # Projet fantasy
-  silk init "Love Story" -w 60000 -c 25 -y      # Romance courte
-
-GENRES DISPONIBLES:
-  polar-psychologique    Polar sophistiqué avec éléments psychologiques
-  fantasy               Fantasy/fantastique avec worldbuilding
-  romance               Romance/sentiment avec développement relationnel
-  literary              Littérature générale/contemporaine
-  thriller              Thriller/suspense action
+OPTIONS GLOBALES:
+  -h, --help  Afficher aide (pour commande: silk COMMAND --help)
   
-SILK = Smart Integrated Literary Kit
-Tisse ensemble tous les éléments de votre roman comme une araignée tisse sa toile.
-HELP
-                return 0
-                ;;
-            -g|--genre)
-                genre="$2"
-                shift 2
-                ;;
-            -l|--language)
-                language="$2"
-                shift 2
-                ;;
-            -w|--words)
-                target_words="$2"
-                shift 2
-                ;;
-            -c|--chapters)
-                target_chapters="$2"
-                shift 2
-                ;;
-            -a|--author)
-                author_name="$2"
-                shift 2
-                ;;
-            -p|--pseudo)
-                author_pseudo="$2"
-                shift 2
-                ;;
-            -y|--yes)
-                interactive=false
-                shift
-                ;;
-            -*)
-                log_error "Option inconnue: $1"
-                return 1
-                ;;
-            *)
-                if [[ -z "$project_name" ]]; then
-                    project_name="$1"
-                fi
-                shift
-                ;;
-        esac
-    done
-    
-    # Mode interactif
-    if [[ "$interactive" == "true" ]]; then
-        log_header "SILK INIT - Smart Integrated Literary Kit"
-        echo -e "${CYAN}Tissons ensemble votre nouveau projet littéraire...${NC}"
-        echo
-        
-        if [[ -z "$project_name" ]]; then
-            read -p "📖 Nom du projet: " project_name
-        fi
-        
-        echo -e "\n🎭 Genres disponibles:"
-        echo "   polar-psychologique (expertise auteur L'Araignée)"
-        echo "   fantasy (worldbuilding structuré)"
-        echo "   romance (arc relationnel développé)"
-        echo "   literary (littérature générale)"
-        echo "   thriller (suspense action)"
-        read -p "🎭 Genre [$genre]: " input_genre
-        genre="${input_genre:-$genre}"
-        
-        read -p "🌍 Langue [$language]: " input_language
-        language="${input_language:-$language}"
-        
-        read -p "📊 Objectif mots [$target_words]: " input_words
-        target_words="${input_words:-$target_words}"
-        
-        read -p "📚 Nombre chapitres [$target_chapters]: " input_chapters
-        target_chapters="${input_chapters:-$target_chapters}"
-        
-        read -p "✍️  Nom auteur [$author_name]: " input_author
-        author_name="${input_author:-$author_name}"
-        
-        read -p "🎭 Pseudonyme [$author_pseudo]: " input_pseudo
-        author_pseudo="${input_pseudo:-$author_pseudo}"
-    fi
-    
-    # Validation
-    if [[ -z "$project_name" ]]; then
-        log_error "Nom de projet requis"
-        return 1
-    fi
-    
-    # Création structure
-    local project_dir="${project_name// /-}"
-    project_dir="${project_dir,,}"  # lowercase
-    
-    if [[ -d "$project_dir" ]]; then
-        log_error "Le répertoire '$project_dir' existe déjà"
-        return 1
-    fi
-    
-    log_info "Tissage du projet '$project_name' dans '$project_dir'"
-    
-    # Créer structure selon le genre
-    create_project_structure "$project_dir" "$project_name" "$genre" "$language" "$target_words" "$target_chapters" "$author_name" "$author_pseudo"
-    
-    log_success "Projet '$project_name' tissé avec succès !"
-    echo
-    log_info "Prochaines étapes:"
-    echo "  cd $project_dir"
-    echo "  silk context --help     # Contexte LLM optimisé"
-    echo "  silk wordcount          # Suivi progression"
-    echo "  silk publish --help     # Publication PDF"
+EXEMPLES SILK:
+  silk init "L'Araignée"                # Nouveau projet polar
+  silk context "Révision Emma" -ch 15   # Contexte LLM chapitre 15
+  silk wordcount 100000                 # Stats avec objectif 100k
+  silk publish -f iphone                # PDF format iPhone
+
+WORKFLOW SILK:
+  1. silk init "Mon Projet"             # 🕷️ Tisser la structure
+  2. [Écrire dans 01-Manuscrit/]        # ✍️  Rédaction avec ## manuscrit
+  3. silk wordcount                     # 📊 Suivre progression  
+  4. silk context "Question LLM"        # 🤖 Analyser avec IA
+  5. silk publish                       # 📖 Générer PDF final
+
+PHILOSOPHIE SILK:
+  Smart      Templates adaptés genre et marché
+  Integrated Workflow unifié conception→publication  
+  Literary   Focus sur fiction sophistiquée
+  Kit        Boîte à outils complète auteur
+
+SILK weaves together all elements of your novel
+like a spider weaves its web.
+
+Pour commencer: silk init --help
+Documentation: https://github.com/oinant/silk-cli
+EOF
 }
 
-create_project_structure() {
-    local project_dir="$1"
-    local project_name="$2"
-    local genre="$3"
-    local language="$4"
-    local target_words="$5"
-    local target_chapters="$6"
-    local author_name="$7"
-    local author_pseudo="$8"
+# === DISPATCH COMMANDES ===
+dispatch_command() {
+    local command="$1"
+    shift
     
-    mkdir -p "$project_dir"
-    cd "$project_dir"
-    
-    # Structure SILK standardisée
-    mkdir -p {00-instructions-llm,01-Manuscrit,02-Personnages/{Principaux,Secondaires},03-Lieux,04-Concepts,07-timeline,10-Lore,20-Pitch-Editeurs,21-Planning,50-Sessions-Claude,60-idees-tome-2,99-Templates}
-    mkdir -p {formats,outputs/{context,publish,temp},filters,.github/workflows}
-    
-    # Git init
-    git init
-    
-    # README avec branding SILK
-    cat > README.md << EOF
-# 🕷️ $project_name
-*Projet SILK - Smart Integrated Literary Kit*
-
-**Genre**: $genre  
-**Langue**: $language  
-**Objectif**: $target_words mots ($target_chapters chapitres)  
-**Auteur**: $author_name${author_pseudo:+ (pseudo: $author_pseudo)}
-
-Généré avec SILK v$SILK_VERSION - *Structured Intelligence for Literary Kreation*
-
-## 🕸️ Structure SILK
-
-SILK tisse ensemble tous les éléments de votre roman :
-
-- \`01-Manuscrit/\` - Chapitres du manuscrit (avec séparateur \`## manuscrit\`)
-- \`02-Personnages/\` - Fiches personnages hiérarchisées  
-- \`04-Concepts/\` - Mécaniques narratives et intrigue
-- \`outputs/\` - Fichiers générés (contexte LLM, PDF)
-
-## 🚀 Workflow SILK
-
-\`\`\`bash
-silk context              # Générer contexte optimisé pour LLM
-silk wordcount           # Statistiques progression intelligentes
-silk publish             # Générer PDF professionnel multi-format
-\`\`\`
-
-## 🤖 Intégration LLM
-
-### Séparateur standardisé
-Chaque chapitre utilise la convention SILK :
-\`\`\`markdown
-# Ch.X : Titre
-
-## Objectifs
-[Métadonnées pour planification]
-
-## manuscrit
-[Contenu pur pour analyse LLM]
-\`\`\`
-
-### Contexte intelligent
-- Range flexible : \`-ch 1-10\`, \`-ch 15,20,25\`
-- Mode normal : Essentiel (personnages + concepts)
-- Mode complet : \`--full\` (+ lieux + statistiques)
-
-## 📖 Documentation
-
-Ce projet suit les conventions SILK pour l'écriture moderne avec IA.
-Chaque génération inclut templates optimisés par genre et marché.
-
-*SILK weaves your story together - like a spider weaves its web*
-EOF
-    
-    # Templates selon genre
-    create_genre_templates "$genre" "$language" "$project_name" "$author_name" "$author_pseudo"
-    
-    # Configuration publication
-    create_publishing_templates "$project_name" "$author_name"
-    
-    # Gitignore
-    cat > .gitignore << 'EOF'
-.DS_Store
-Thumbs.db
-*.tmp
-*~
-outputs/temp/
-.silk-cache/
-EOF
-    
-    # Premier commit avec branding SILK
-    git add .
-    git commit -m "🕷️ Initial SILK project: $project_name
-
-🕸️ Smart Integrated Literary Kit v$SILK_VERSION
-📚 Projet: $project_name
-🎭 Genre: $genre  
-🎯 Objectif: $target_words mots ($target_chapters chapitres)
-✍️ Auteur: $author_name
-
-Structure tissée avec templates $genre optimisés.
-Ready for: silk context, wordcount, publish"
-    
-    log_success "Structure SILK créée et initialisée avec Git"
-}
-
-create_genre_templates() {
-    local genre="$1"
-    local language="$2" 
-    local project_name="$3"
-    local author_name="$4"
-    local author_pseudo="$5"
-    
-    case "$genre" in
-        "polar-psychologique")
-            create_polar_templates "$project_name" "$author_name" "$author_pseudo"
+    case "$command" in
+        init)
+            load_module "commands/init.sh" || return 1
+            cmd_init "$@"
             ;;
-        "fantasy")
-            create_fantasy_templates "$project_name" "$author_name" "$author_pseudo"
+        context)
+            load_module "commands/context.sh" || return 1
+            cmd_context "$@"
             ;;
-        "romance")
-            create_romance_templates "$project_name" "$author_name" "$author_pseudo"
+        wordcount|wc)
+            load_module "commands/wordcount.sh" || return 1
+            cmd_wordcount "$@"
+            ;;
+        publish|pdf)
+            load_module "commands/publish.sh" || return 1
+            cmd_publish "$@"
+            ;;
+        config)
+            load_module "commands/config.sh" || return 1
+            cmd_config "$@"
+            ;;
+        debug)
+            load_module "commands/debug.sh" || return 1
+            cmd_debug "$@"
+            ;;
+        version)
+            echo "🕷️ SILK v$SILK_VERSION - Smart Integrated Literary Kit"
+            echo "Structured Intelligence for Literary Kreation"
+            echo "https://github.com/oinant/silk-cli"
+            echo "📁 Modules: $SILK_LIB_DIR"
+            ;;
+        -h|--help|help|"")
+            show_help
             ;;
         *)
-            create_literary_templates "$project_name" "$author_name" "$author_pseudo"
+            log_error "Commande SILK inconnue: $command"
+            echo "💡 Utilisez 'silk --help' pour voir les commandes disponibles"
+            echo "🕸️ SILK weaves intelligence into literary creation"
+            return 1
             ;;
     esac
-    
-    # Template chapitre SILK universel
-    cat > "99-Templates/Template-Chapitre.md" << 'EOF'
-# Ch.X : [TITRE]
-
-## Objectifs SILK
-- **Intrigue** : Avancement enquête/conflit principal
-- **Développement** : Évolution personnages
-- **Révélations** : Informations dévoilées au lecteur
-- **Tension** : Niveau suspense/émotion
-
-## Personnages actifs
-- [[Protagoniste]] : Actions et motivations
-- [[Deutéragoniste]] : Rôle dans ce chapitre
-
-## Liens narratifs
-← Ch.X : Continuité depuis chapitre précédent
-→ Ch.X : Préparation chapitre suivant
-
-## manuscrit
-
-*[SILK: Tout le contenu après cette ligne sera analysé par LLM]*
-
-[Début du chapitre...]
-EOF
-
-    # Template personnage SILK
-    cat > "99-Templates/Template-Personnage.md" << 'EOF'
-# [Nom Personnage]
-
-## Identité
-- **Âge** : 
-- **Fonction** : 
-- **Statut social** : 
-
-## Psychologie SILK
-### Motivations profondes
-- **Désir conscient** : Ce que le personnage pense vouloir
-- **Besoin inconscient** : Ce dont il a vraiment besoin
-- **Peur principale** : Ce qui le paralyse
-
-### Failles et contradictions  
-- **Défaut majeur** : Trait qui cause des problèmes
-- **Force cachée** : Potentiel non exploité
-- **Évolution prévue** : Arc de transformation
-
-## Relations
-- [[Personnage]] : Nature relation et évolution
-
-## Arc narratif
-- **Introduction** : Première apparition et impression
-- **Développement** : Révélation progressive de la complexité  
-- **Climax** : Moment de vérité/choix crucial
-- **Résolution** : État final et apprentissage
-
-## Notes développement SILK
-> Intelligence narrative : Comment ce personnage sert l'intrigue
-> Résonance émotionnelle : Impact sur le lecteur cible
-EOF
 }
 
-create_polar_templates() {
-    local project_name="$1"
-    local author_name="$2" 
-    local author_pseudo="$3"
-    
-    # Instructions LLM spécialisées polar + SILK
-    cat > "00-instructions-llm/instructions.md" << EOF
-# Instructions LLM - $project_name
-*Projet SILK - Smart Integrated Literary Kit*
-
-## 🎯 CONTEXTE PROJET
-**Genre** : Polar sophistiqué/psychologique  
-**Public cible** : Lectrices CSP/CSP+ 35-55 ans (expertise L'Araignée)
-**Auteur** : $author_name${author_pseudo:+ (pseudo: $author_pseudo)}
-**Architecture** : SILK - Structure intelligence intégrée
-
-## 🕷️ PHILOSOPHIE SILK
-SILK tisse ensemble tous les éléments narratifs comme une araignée tisse sa toile :
-- **Smart** : Templates adaptés genre et marché
-- **Integrated** : Workflow unifié conception→publication
-- **Literary** : Focus sur fiction sophistiquée
-- **Kit** : Boîte à outils complète auteur
-
-## 🧠 MÉCANIQUES POLAR SILK
-### Structure enquête intelligente
-- **Mystère central** : Révélations progressives calculées
-- **Enquête méthodique** : Logique déductive crédible
-- **Psychologie approfondie** : Motivations complexes et nuancées
-- **Fausses pistes** : Misdirection élégante sans frustration
-
-### Style et ton (public femmes CSP+ 35-55)
-- **Sophistication accessible** : Intelligent sans prétention
-- **Développement émotionnel** : Profondeur psychologique
-- **Dialogue authentique** : Voix différenciées par personnage
-- **Rythme maîtrisé** : Alternance tension/respiration
-
-## 📋 INSTRUCTIONS SPÉCIFIQUES SILK
-### Analyse Personnages
-- Psychologie crédible et évolutive
-- Motivations claires avec contradictions humaines
-- Relations authentiques et dynamiques
-- Arc de transformation satisfaisant
-
-### Structure Narrative  
-- Équilibre investigation/développement personnel
-- Rythme soutenu avec respirations émotionnelles
-- Révélations préparées et logiquement satisfaisantes
-- Résolution surprenante mais inévitable rétrospectivement
-
-### Contexte marché français
-- Références culturelles parisiennes/françaises
-- Codes sociaux CSP+ intégrés naturellement
-- Éviter clichés américains du genre
-- Ancrage géographique précis et vécu
-EOF
-
-    # Concepts spécifiques polar SILK
-    cat > "04-Concepts/Enquête-Structure.md" << 'EOF'
-# Structure d'Enquête SILK
-
-## Méthodologie narrative
-- **Scène de crime** : Établissement mystère avec éléments intriguants
-- **Collecte indices** : Progression logique avec surprises
-- **Interrogatoires** : Révélation personnalités et relations
-- **Fausses pistes** : Maintien suspense sans manipulation lecteur
-- **Révélation finale** : Résolution logique et émotionnellement satisfaisante
-
-## Rythme SILK (30 chapitres)
-- **Setup** : Accroche et établissement univers (Ch1-3)
-- **Investigation** : Développement enquête et personnages (Ch4-20)
-- **Complications** : Escalade tension et révélations (Ch21-26)
-- **Climax** : Confrontation et révélation (Ch27-28)
-- **Résolution** : Dénouement et ouverture (Ch29-30)
-
-## Spécificités public cible
-- **Lectrices CSP+ 35-55** : Sophistication psychologique
-- **Attentes genre** : Justice, mais nuancée
-- **Engagement émotionnel** : Identification protagonistes
-- **Réalisme social** : Crédibilité environnement professionnel/social
-EOF
-
-    # Exemple chapitre polar
-    cat > "01-Manuscrit/Ch01-Premier-Contact.md" << 'EOF'
-# Ch.01 : Premier Contact
-
-## Objectifs SILK
-- **Intrigue** : Établir le mystère central et accrocher le lecteur
-- **Développement** : Présenter protagoniste avec défaut intriguant
-- **Révélations** : Indices subtils pour relecture
-- **Tension** : Malaise immédiat, questions sans réponses
-
-## Personnages actifs
-- [[Protagoniste]] : Introduction avec vulnérabilité et compétence
-- [[Victime]] : Établir sympathie et mystère
-- [[Témoins]] : Premiers éléments contradictoires
-
-## Liens narratifs
-← Début : Immersion directe in medias res
-→ Ch.02 : Approfondissement enquête et protagoniste
-
-## manuscrit
-
-Le téléphone vibrait depuis trois minutes sur la table de nuit. Claire Moreau observait l'écran dans la pénombre de sa chambre, 6h42 du matin, "Commissariat - Urgent" qui clignotait avec insistance.
-
-Elle savait déjà que sa journée de congé venait de s'évaporer.
-
-— Moreau.
-
-— Claire ? C'est Dubois. Désolé de te réveiller, mais on a un problème.
-
-Sa voix portait cette tension particulière qu'elle ne lui connaissait que dans les affaires compliquées. Le genre d'affaires qui font la une des journaux et donnent des cauchemars aux commissaires.
-
-— Quel genre de problème ?
-
-— Le genre qui va nous occuper pendant des semaines. Une femme, la quarantaine, retrouvée dans son appartement du 16ème. Scène... particulière.
-
-Claire s'assit dans son lit, déjà en train d'enfiler mentalement sa tenue de travail.
-
-— Particulière comment ?
-
-— Tu verras. 47 avenue Foch, au sixième. L'identité judiciaire est déjà sur place.
-
-*[Continuez le chapitre en développant l'arrivée sur la scène de crime, les premiers indices troublants, et l'établissement du mystère central...]*
-EOF
-}
-
-create_fantasy_templates() {
-    local project_name="$1"
-    local author_name="$2"
-    local author_pseudo="$3"
-    
-    mkdir -p "05-Worldbuilding/{Magie,Peuples,Histoire,Géographie}"
-    
-    cat > "00-instructions-llm/instructions.md" << EOF
-# Instructions LLM - $project_name
-*Projet SILK Fantasy - Smart Integrated Literary Kit*
-
-## 🎯 CONTEXTE PROJET  
-**Genre** : Fantasy/Fantastique avec worldbuilding structuré
-**Auteur** : $author_name${author_pseudo:+ (pseudo: $author_pseudo)}
-**Architecture** : SILK - Structured Intelligence for Literary Kreation
-
-## 🕷️ APPROCHE SILK FANTASY
-SILK tisse un univers cohérent et immersif :
-- **Smart** : Système magique avec règles logiques
-- **Integrated** : Cohérence entre tous éléments d'univers
-- **Literary** : Profondeur narrative au-delà du spectacle
-- **Kit** : Outils de worldbuilding systématiques
-
-## 🌍 WORLDBUILDING SILK
-### Système magique cohérent
-- **Règles fondamentales** : Lois physiques alternatives
-- **Limitations claires** : Coût et contraintes réalistes
-- **Intégration sociale** : Impact sur civilisation
-- **Évolution narrative** : Progression logique avec intrigue
-
-### Construction univers
-- **Géographie réfléchie** : Climat, ressources, commerce
-- **Cultures distinctes** : Langues, traditions, conflits
-- **Histoire crédible** : Événements formateurs logiques
-- **Détails vécus** : Quotidien réaliste dans le fantastique
-
-## 📋 INSTRUCTIONS SPÉCIFIQUES SILK
-### Cohérence narrative absolue
-- **Règles d'univers** : Jamais de violations arbitraires
-- **Évolution worldbuilding** : Révélations préparées
-- **Équilibre réalisme/fantastique** : Crédibilité émotionnelle
-- **Détails immersifs** : Spécificités qui rendent vivant
-
-### Développement personnages fantasy
-- **Motivations universelles** : Humaines malgré contexte fantastique
-- **Pouvoirs et failles** : Capacités avec coûts personnels
-- **Conflits authentiques** : Enjeux émotionnels réels
-- **Arc transformation** : Croissance à travers épreuves fantastiques
-EOF
-
-    cat > "05-Worldbuilding/Système-Magique.md" << 'EOF'
-# Système Magique SILK
-
-## Règles fondamentales
-- **Source d'énergie** : D'où provient le pouvoir magique ?
-- **Mécanisme d'accès** : Comment les individus y accèdent-ils ?
-- **Limitations physiques** : Fatigue, douleur, durée ?
-- **Coût personnel** : Prix émotionnel/spirituel/physique ?
-
-## Applications pratiques
-- **Combat magique** : Offensive/défensive avec limitations
-- **Magie utilitaire** : Amélioration vie quotidienne
-- **Rituels complexes** : Grandes magies nécessitant préparation
-- **Magie spontanée** : Réactions émotionnelles/instinctives
-
-## Intégration sociale SILK
-- **Acceptation culturelle** : Comment la société voit-elle la magie ?
-- **Régulation/contrôle** : Lois, guildes, restrictions ?
-- **Apprentissage** : Formation, mentors, autodidactes ?
-- **Stratification** : Classes sociales liées aux capacités ?
-- **Économie magique** : Impact sur commerce et artisanat ?
-
-## Cohérence narrative
-- **Évolution historique** : Comment le système a-t-il évolué ?
-- **Conflits magiques** : Guerres, révolutions liées au pouvoir ?
-- **Mystères non résolus** : Aspects encore incompris ?
-- **Menaces existentielles** : Dangers du système lui-même ?
-EOF
-
-    # Template personnage fantasy
-    cat > "02-Personnages/Principaux/Protagoniste-Mage.md" << 'EOF'
-# [Nom Protagoniste]
-
-## Identité
-- **Âge** : 
-- **Origine** : Région/culture de naissance
-- **Capacités magiques** : Niveau et spécialités
-- **Statut social** : Position dans hiérarchie magique/sociale
-
-## Psychologie SILK Fantasy
-### Motivations profondes
-- **Quête personnelle** : Objectif émotionnel/spirituel
-- **Responsabilité magique** : Fardeau des capacités
-- **Peur du pouvoir** : Angoisse destruction/corruption
-
-### Relation à la magie
-- **Découverte/apprentissage** : Comment a-t-il appris ?
-- **Limites personnelles** : Faiblesses spécifiques
-- **Coût émotionnel** : Prix de l'usage magique
-- **Évolution prévue** : Progression des capacités
-
-## Arc narratif fantasy
-- **Révélation pouvoir** : Prise de conscience capacités
-- **Apprentissage difficile** : Maîtrise et erreurs
-- **Test limites** : Confrontation avec insuffisance
-- **Transformation** : Nouveau rapport au pouvoir
-
-## Relations dans l'univers
-- [[Mentor magique]] : Guide et enseignements
-- [[Rival/Nemesis]] : Opposition idéologique/magique
-- [[Être aimé]] : Vulnérabilité humaine malgré pouvoir
-EOF
-}
-
-create_romance_templates() {
-    local project_name="$1"
-    local author_name="$2"
-    local author_pseudo="$3"
-    
-    cat > "00-instructions-llm/instructions.md" << EOF
-# Instructions LLM - $project_name
-*Projet SILK Romance - Smart Integrated Literary Kit*
-
-## 🎯 CONTEXTE PROJET
-**Genre** : Romance/Développement relationnel authentique
-**Auteur** : $author_name${author_pseudo:+ (pseudo: $author_pseudo)}
-**Architecture** : SILK - Structured Intelligence for Literary Kreation
-
-## 🕷️ APPROCHE SILK ROMANCE
-SILK tisse une histoire d'amour crédible et émotionnellement satisfaisante :
-- **Smart** : Psychologie relationnelle réaliste
-- **Integrated** : Arc romantique cohérent avec développement personnel
-- **Literary** : Profondeur émotionnelle au-delà des clichés
-- **Kit** : Outils narratifs pour romance authentique
-
-## 💕 MÉCANIQUES ROMANCE SILK
-### Arc relationnel structuré
-- **Rencontre significative** : Circonstances révélatrices
-- **Attraction complexe** : Au-delà du physique
-- **Obstacles authentiques** : Conflits de valeurs/buts/peurs
-- **Approfondissement graduel** : Vulnérabilité progressive
-- **Crise révélatrice** : Test de la solidité relationnelle
-- **Résolution mérité** : Engagement basé sur croissance mutuelle
-
-### Développement émotionnel authentique
-- **Dialogue naturel** : Conversations révélatrices et différenciées
-- **Chimie tangible** : Tension romantique sans explicite gratuit
-- **Croissance individuelle** : Chaque partenaire évolue
-- **Conflits constructifs** : Désaccords qui renforcent la relation
-
-## 📋 INSTRUCTIONS SPÉCIFIQUES SILK
-### Relations réalistes
-- **Personnages complets** : Vies au-delà de la romance
-- **Communication authentique** : Maladresses et sincérité
-- **Conflits crédibles** : Problèmes réels, résolutions méritées
-- **Équilibre vulnérabilité/force** : Partenaires égaux et complémentaires
-- **Respect mutuel** : Acceptation des différences
-
-### Éviter les écueils
-- **Insta-love** : Développement graduel obligatoire
-- **Perfection irréaliste** : Défauts humanisants
-- **Dépendance toxique** : Amour qui libère, pas qui enchaîne
-- **Clichés usés** : Situations originales et fraîches
-EOF
-
-    cat > "04-Concepts/Arc-Relationnel.md" << 'EOF'
-# Arc Relationnel Principal SILK
-
-## Étapes développement romance
-- **Rencontre marquante** : Circonstances révélatrices de personnalité
-- **Attraction initiale** : Éléments d'attirance au-delà du physique
-- **Résistance/obstacles** : Peurs, différences, complications externes
-- **Rapprochement** : Moments de vulnérabilité et découverte mutuelle
-- **Conflit majeur** : Test de la relation et des valeurs
-- **Résolution/engagement** : Choix conscient basé sur croissance
-
-## Dynamiques SILK
-- **Chimie émotionnelle** : Tension et complicité naturelles
-- **Complémentarité** : Forces qui compensent faiblesses mutuelles
-- **Croissance parallèle** : Évolution individuelle stimulée par la relation
-- **Respect profond** : Admiration au-delà de l'attraction
-
-## Obstacles authentiques
-- **Internes** : Peurs, traumatismes, insécurités personnelles
-- **Externes** : Famille, carrière, géographie, classe sociale
-- **Valeurs** : Différences fondamentales à négocier
-- **Timing** : Mauvais moment dans parcours de vie
-
-## Résolution satisfaisante
-- **Sacrifice mutuel** : Compromis équilibrés des deux côtés
-- **Communication** : Dialogue honnête sur besoins/peurs
-- **Choix actif** : Décision consciente, pas simple "happy ending"
-- **Vision partagée** : Projet de vie compatible découvert
-EOF
-}
-
-create_literary_templates() {
-    local project_name="$1"
-    local author_name="$2"
-    local author_pseudo="$3"
-    
-    cat > "00-instructions-llm/instructions.md" << EOF
-# Instructions LLM - $project_name
-*Projet SILK Literary - Smart Integrated Literary Kit*
-
-## 🎯 CONTEXTE PROJET
-**Genre** : Littérature contemporaine/générale
-**Auteur** : $author_name${author_pseudo:+ (pseudo: $author_pseudo)}
-**Architecture** : SILK - Structured Intelligence for Literary Kreation
-
-## 🕷️ APPROCHE SILK LITERARY
-SILK tisse une œuvre littéraire cohérente et profonde :
-- **Smart** : Thèmes universels traités avec intelligence
-- **Integrated** : Forme et fond en harmonie
-- **Literary** : Qualité d'écriture et profondeur humaine
-- **Kit** : Techniques narratives sophistiquées
-
-## 📚 MÉCANIQUES LITERARY SILK
-### Style et voix narrative
-- **Voix distinctive** : Point de vue cohérent et personnel
-- **Prose soignée** : Attention au rythme et à la musicalité
-- **Sous-texte riche** : Significations multiples et nuances
-- **Économie narrative** : Chaque élément sert le propos
-
-### Développement thématique
-- **Thèmes universels** : Condition humaine, société, identité
-- **Exploration nuancée** : Pas de réponses simplistes
-- **Résonance contemporaine** : Ancrage dans époque actuelle
-- **Profondeur psychologique** : Motivations complexes
-
-## 📋 INSTRUCTIONS SPÉCIFIQUES SILK
-### Excellence littéraire
-- **Caractérisation subtile** : Révélation progressive personnalités
-- **Dialogue authentique** : Voix distinctes et naturelles
-- **Structure maîtrisée** : Architecture narrative réfléchie
-- **Symbolisme intégré** : Métaphores organiques, pas plaquées
-EOF
-}
-
-create_publishing_templates() {
-    local project_name="$1"
-    local author_name="$2"
-    
-    cat > "formats/base.yaml" << EOF
-title: "$project_name"
-author: "$author_name"
-date: "$(date '+%Y-%m-%d')"
-lang: fr-FR
-fontsize: 11pt
-linestretch: 1.2
-documentclass: book
-classoption: 
-  - openany
-  - twoside
-mainfont: "EB Garamond"
-mainfontoptions:
-  - Numbers=OldStyle
-  - Ligatures=TeX
-indent: true
-block-headings: true
-header-includes: |
-  \usepackage[french]{babel}
-  \usepackage{microtype}
-  \clubpenalty=10000
-  \widowpenalty=10000
-  \usepackage{fancyhdr}
-  \pagestyle{fancy}
-  \fancyhf{}
-  \fancyhead[LE,RO]{\thepage}
-  \fancyhead[RE]{$project_name}
-  \fancyhead[LO]{\leftmark}
-  \renewcommand{\headrulewidth}{0pt}
-EOF
-
-    cat > "formats/digital.yaml" << 'EOF'
-# Format Digital SILK - Lecture écran
-geometry: "paperwidth=6in,paperheight=9in,margin=0.5in"
-fontsize: 11pt
-linestretch: 1.2
-EOF
-
-    cat > "formats/iphone.yaml" << 'EOF'
-# Format iPhone SILK - Lecture mobile
-geometry: "paperwidth=4.7in,paperheight=8.3in,margin=0.3in"
-fontsize: 10pt
-linestretch: 1.1
-EOF
-
-    cat > "formats/kindle.yaml" << 'EOF'
-# Format Kindle SILK - Liseuse e-ink
-geometry: "paperwidth=5in,paperheight=7.5in,margin=0.4in"
-fontsize: 10pt
-linestretch: 1.15
-EOF
-
-    cat > "formats/book.yaml" << 'EOF'
-# Format Book SILK - Impression papier
-geometry: "a5paper,margin=0.8in"
-fontsize: 11pt
-linestretch: 1.3
-twoside: true
-EOF
-}
-
-# === COMMANDE CONTEXT ===
-cmd_context() {
-    ensure_silk_context
-    
-    local question="Analyse générale"
-    local chapter_range="all"
-    local mode="normal"
-    local include_timeline=false
-    local include_wordcount=false
-    local include_sharedcontext=true
-    local output_combined=false
-    
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                cat << 'HELP'
-🕷️ SILK CONTEXT - Génération contexte optimisé pour LLM
-
-USAGE:
-  silk context [QUESTION] [OPTIONS]
-
-OPTIONS:
-  -ch, --chapters RANGE     Chapitres (ex: 1-4, 20,28,30, all)
-  --full                    Mode complet (tous éléments)
-  --timeline                Inclure timeline dans manuscrit
-  --wc, --wordcount         Inclure statistiques mots
-  --no-metadata             Manuscrit seul (pas de métadonnées)
-  --combined                Un seul fichier contexte+manuscrit
-  -h, --help                Afficher cette aide
-
-EXEMPLES:
-  silk context "Révision chapitre 15"
-  silk context --chapters 1-10 --full
-  silk context --timeline --wc
-  silk context "Cohérence Emma" -ch 15,18,20-25
-
-MODES SILK:
-  normal    Essentiel (personnages principaux + concepts)
-  --full    Complet (+ personnages secondaires + lieux + stats)
-
-RANGE SYNTAX:
-  all         Tous les chapitres
-  1-10        Chapitres 1 à 10 inclus
-  15,20,25    Chapitres 15, 20 et 25
-  10,15-18    Chapitre 10 + chapitres 15 à 18
-  
-SILK tisse le contexte parfait pour votre analyse LLM.
-HELP
-                return 0
-                ;;
-            -ch|--chapters)
-                chapter_range="$2"
-                shift 2
-                ;;
-            --full)
-                mode="full"
-                shift
-                ;;
-            --timeline)
-                include_timeline=true
-                shift
-                ;;
-            --wc|--wordcount)
-                include_wordcount=true
-                shift
-                ;;
-            --no-metadata)
-                include_sharedcontext=false
-                shift
-                ;;
-            --combined)
-                output_combined=true
-                shift
-                ;;
-            -*)
-                log_error "Option inconnue: $1"
-                return 1
-                ;;
-            *)
-                question="$1"
-                shift
-                ;;
-        esac
-    done
-    
-    log_info "🕸️ SILK tisse le contexte LLM..."
-    echo "   Question: $question"
-    echo "   Chapitres: $chapter_range"
-    echo "   Mode: $mode"
-    
-    # Génération des fichiers contexte
-    generate_silk_context "$question" "$chapter_range" "$mode" "$include_timeline" "$include_wordcount" "$include_sharedcontext" "$output_combined"
-    
-    log_success "Contexte SILK tissé dans outputs/context/"
-    
-    # Statistiques des fichiers générés
-    if [[ -f "outputs/context/manuscrit.md" ]]; then
-        local word_count=$(wc -w < "outputs/context/manuscrit.md")
-        log_info "📖 Manuscrit: $word_count mots"
-    fi
-    if [[ -f "outputs/context/sharedcontext.md" ]]; then
-        local context_size=$(wc -w < "outputs/context/sharedcontext.md")
-        log_info "🧠 Métadonnées: $context_size mots"
-    fi
-    if [[ -f "outputs/context/silk-context-combined.md" ]]; then
-        local combined_size=$(wc -w < "outputs/context/silk-context-combined.md")
-        log_info "🕷️ Contexte combiné: $combined_size mots"
-    fi
-}
-
-generate_silk_context() {
-    local question="$1"
-    local chapter_range="$2"
-    local mode="$3"
-    local include_timeline="$4"
-    local include_wordcount="$5"
-    local include_sharedcontext="$6"
-    local output_combined="$7"
-    
-    mkdir -p "outputs/context"
-    
-    # Générer manuscrit.md
-    {
-        echo "# 🕷️ SILK Manuscrit - Contexte LLM"
-        echo "*Smart Integrated Literary Kit - Structured Intelligence for Literary Kreation*"
-        echo
-        echo "**Question:** $question"
-        echo "**Chapitres:** $chapter_range"
-        echo "**Mode:** $mode"
-        echo "**Généré le:** $(date '+%Y-%m-%d %H:%M:%S')"
-        echo "**Projet:** $(basename "$PWD")"
-        echo
-        echo "---"
-        echo
-        
-        # Extraire chapitres selon le range
-        extract_chapters_by_range "$chapter_range"
-        
-    } > "outputs/context/manuscrit.md"
-    
-    # Générer sharedcontext.md si demandé
-    if [[ "$include_sharedcontext" == "true" ]]; then
-        {
-            echo "# 🕸️ SILK Métadonnées - Contexte Projet"
-            echo "*Smart Integrated Literary Kit - Structured Intelligence for Literary Kreation*"
-            echo
-            echo "**Question:** $question"
-            echo "**Mode:** $mode"  
-            echo "**Généré le:** $(date '+%Y-%m-%d %H:%M:%S')"
-            echo "**Projet:** $(basename "$PWD")"
-            echo
-            echo "---"
-            echo
-            
-            # Extraire métadonnées selon le mode
-            extract_metadata_by_mode "$mode"
-            
-            # Inclure statistiques si demandé
-            if [[ "$include_wordcount" == "true" ]]; then
-                echo
-                echo "## 📊 Statistiques Progression SILK"
-                generate_wordcount_summary
-            fi
-            
-        } > "outputs/context/sharedcontext.md"
+# === VALIDATION ENVIRONNEMENT ===
+validate_environment() {
+    # Vérifier version Bash
+    if [[ "${BASH_VERSION%%.*}" -lt 4 ]]; then
+        log_warning "Bash 4.0+ recommandé (actuel: $BASH_VERSION)"
     fi
     
-    # Générer fichier combiné si demandé
-    if [[ "$output_combined" == "true" ]]; then
-        {
-            echo "# 🕷️ SILK Contexte Complet"
-            echo "*Smart Integrated Literary Kit - Contexte LLM Unifié*"
-            echo
-            echo "**Question:** $question"
-            echo "**Chapitres:** $chapter_range"
-            echo "**Mode:** $mode"
-            echo "**Généré le:** $(date '+%Y-%m-%d %H:%M:%S')"
-            echo
-            echo "---"
-            echo
-            
-            if [[ "$include_sharedcontext" == "true" ]]; then
-                echo "# 🧠 MÉTADONNÉES PROJET"
-                echo
-                extract_metadata_by_mode "$mode"
-                echo
-                echo "---"
-                echo
-            fi
-            
-            echo "# 📖 MANUSCRIT"
-            echo
-            extract_chapters_by_range "$chapter_range"
-            
-        } > "outputs/context/silk-context-combined.md"
+    # Vérifier répertoire modules
+    if [[ ! -d "$SILK_LIB_DIR" ]]; then
+        log_error "Répertoire modules SILK non trouvé: $SILK_LIB_DIR"
+        echo "💡 Solutions:"
+        echo "   - Installation complète: curl -sSL install-url | bash"
+        echo "   - Variable SILK_LIB_DIR pointant vers lib/"
+        return 1
     fi
+    
+    # Initialisation première utilisation
+    if [[ ! -f "$SILK_CONFIG" ]]; then
+        log_info "Première utilisation SILK - initialisation..."
+        mkdir -p "$SILK_HOME"
+        if silk_config_init; then
+            log_success "Configuration SILK initialisée"
+        else
+            log_warning "Impossible d'initialiser la configuration"
+        fi
+    fi
+    
+    return 0
 }
 
-parse_chapter_range() {
-    local range="$1"
-    local chapters=()
+# === POINT D'ENTRÉE PRINCIPAL ===
+main() {
+    # Validation environnement
+    validate_environment || exit 1
     
-    if [[ "$range" == "all" ]]; then
-        # Tous les chapitres disponibles
-        for file in 01-Manuscrit/Ch*.md; do
-            if [[ -f "$file" ]]; then
-                local num=$(extract_chapter_number "$file")
-                if [[ -n "$num" ]]; then
-                    chapters+=("$num")
-                fi
-            fi
-        done
+    # Chargement configuration
+    silk_config_load || {
+        log_warning "Impossible de charger la configuration"
+    }
+    
+    # Dispatch commande
+    if [[ $# -eq 0 ]]; then
+        show_help
     else
-        # Parser les ranges complexes : 1-5,10,15-18
-        IFS=',' read -ra PARTS <<< "$range"
-        for part in "${PARTS[@]}"; do
-            if [[ "$part" =~ ^([0-9]+)-([0-9]+)$ ]]; then
-                # Range: 1-5
-                local start="${BASH_REMATCH[1]}"
-                local end="${BASH_REMATCH[2]}"
-                for ((i=start; i<=end; i++)); do
-                    chapters+=("$i")
-                done
-            elif [[ "$part" =~ ^[0-9]+$ ]]; then
-                # Numéro simple: 10
-                chapters+=("$part")
-            fi
-        done
-    fi
-    
-    # Retourner la liste triée et unique
-    printf '%s\n' "${chapters[@]}" | sort -nu
-}
-
-extract_chapter_number() {
-    local filename="$(basename "$1")"
-    # Extraire le numéro du chapitre depuis Ch01, Ch1, etc.
-    if [[ "$filename" =~ ^[Cc]h0*([0-9]+) ]]; then
-        echo "${BASH_REMATCH[1]}"
+        dispatch_command "$@"
     fi
 }
 
-extract_chapters_by_range() {
-    local range="$1"
-    local chapter_nums
-    readarray -t chapter_nums < <(parse_chapter_range "$range")
-    
-    if [[ ${#chapter_nums[@]} -eq 0 ]]; then
-        echo "## ⚠️ Aucun chapitre trouvé pour le range: $range"
-        return
-    fi
-    
-    echo "## 📚 Chapitres extraits: ${chapter_nums[*]}"
-    echo
-    
-    for num in "${chapter_nums[@]}"; do
-        # Chercher le fichier correspondant
-        local found_file=""
-        for file in 01-Manuscrit/Ch*.md; do
-            if [[ -f "$file" ]]; then
-                local file_num=$(extract_chapter_number "$file")
-                if [[ "$file_num" == "$num" ]]; then
-                    found_file="$file"
-                    break
-                fi
-            fi
-        done
-        
-        if [[ -n "$found_file" ]]; then
-            local chapter_title=$(head -n1 "$found_file" | sed 's/^#*\s*//')
-            echo "## $chapter_title"
-            echo
-            
-            # Extraire le contenu après "## manuscrit"
-            local found_marker=false
-            while IFS= read -r line; do
-                if [[ "$line" == *"$VAULT_MARKER"* ]]; then
-                    found_marker=true
-                    continue
-                fi
-                
-                if [[ "$found_marker" == true ]]; then
-                    echo "$line"
-                fi
-            done < "$found_file"
-            echo
-            echo "---"
-            echo
-        else
-            echo "## ⚠️ Chapitre $num non trouvé"
-            echo
-        fi
-    done
-}
+# === GESTION SIGNAUX ===
+trap 'echo "🕷️ SILK interrupted - web partially woven"; exit 130' INT
+trap 'echo "🕸️ SILK terminated gracefully"; exit 143' TERM
 
-extract_metadata_by_mode() {
-    local mode="$1"
-    
-    # Instructions LLM toujours incluses
-    if [[ -f "00-instructions-llm/instructions.md" ]]; then
-        echo "## 🧠 Instructions LLM"
-        cat "00-instructions-llm/instructions.md"
-        echo
-        echo "---"
-        echo
-    fi
-    
-    echo "## 👥 Personnages principaux"
-    for file in 02-Personnages/*.md 02-Personnages/Principaux/*.md; do
-        if [[ -f "$file" ]]; then
-            echo "### $(basename "$file" .md)"
-            cat "$file"
-            echo
-        fi
-    done
-    echo "---"
-    echo
+# === EXÉCUTION ===
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
 
-    echo "## 🧩 Concepts narratifs"
-    for file in 04-Concepts/*.md; do
-        if [[ -f "$file" ]]; then
-            echo "### $(basename "$file" .md)"
-            cat "$file"
-            echo
-        fi
-    done
-    echo "---"
-    echo
-    
-    if [[ "$mode" == "full" ]]; then
-        echo "## 👤 Personnages secondaires"
-        for file in 02-Personnages/Secondaires/*.md 02-Personnages/Secondaires/*/*.md; do
-            if [[ -f "$file" ]]; then
-                echo "### $(basename "$file" .md)"
-                cat "$file"
-                echo
-            fi
-        done
-        echo "---"
-        echo
-        
-        echo "## 🏘️ Lieux"
-        for file in 03-Lieux/*.md; do
-            if [[ -f "$file" ]]; then
-                echo "### $(basename "$file" .md)"
-                cat "$file"
-                echo
-            fi
-        done
-        echo "---"
-        echo
-        
-        # Worldbuilding pour fantasy
-        if [[ -d "05-Worldbuilding" ]]; then
-            echo "## 🌍 Worldbuilding"
-            for file in 05-Worldbuilding/*.md 05-Worldbuilding/*/*.md; do
-                if [[ -f "$file" ]]; then
-                    echo "### $(basename "$file" .md)"
-                    cat "$file"
-                    echo
-                fi
-            done
-            echo "---"
-            echo
-        fi
-    fi
-}
-
-generate_wordcount_summary() {
-    local total_words=0
-    local chapter_count=0
-    
-    echo "### Progression manuscrit"
-    echo
-    echo "| Chapitre | Mots | Titre |"
-    echo "|----------|------|-------|"
-    
-    for file in 01-Manuscrit/Ch*.md; do
-        if [[ -f "$file" ]]; then
-            local chapter_name=$(basename "$file" .md)
-            local chapter_title=$(head -n1 "$file" | sed 's/^#*\s*//' | cut -c1-40)
-            
-            # Compter mots après "## manuscrit"
-            local words=0
-            if grep -q "$VAULT_MARKER" "$file"; then
-                words=$(sed -n "/$VAULT_MARKER/,\$p" "$file" | tail -n +2 | wc -w)
-            fi
-            
-            if [[ $words -gt 0 ]]; then
-                ((chapter_count++))
-                total_words=$((total_words + words))
-                echo "| $chapter_name | $words | $chapter_title |"
-            fi
-        fi
-    done
-    
-    echo
-    echo "**Total:** $total_words mots sur $chapter_count chapitres"
-    if [[ $chapter_count -gt 0 ]]; then
-        local avg_words=$((total_words / chapter_count))
-        echo "**Moyenne:** $avg_words mots/chapitre"
-    fi
-}
-
-# === COMMANDE WORDCOUNT ===
-cmd_wordcount() {
-    ensure_silk_context
-    
-    local target_words="${SILK_DEFAULT_TARGET_WORDS:-80000}"
-    local show_details=true
-    local show_projections=true
-    
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                cat << 'HELP'
-📊 SILK WORDCOUNT - Statistiques progression manuscrit
-
-USAGE:
-  silk wordcount [TARGET_WORDS] [OPTIONS]
-
-OPTIONS:
-  -t, --target NUMBER       Objectif en mots (défaut config)
-  --summary                 Résumé uniquement (pas de détails)
-  --no-projections         Pas de calculs objectif
-  -h, --help                Afficher cette aide
-
-EXEMPLES:
-  silk wordcount             # Objectif depuis config
-  silk wordcount 100000      # Objectif 100k mots
-  silk wordcount -t 60000    # Objectif 60k (novella)
-  silk wordcount --summary   # Résumé rapide
-
-SEUILS DE RÉFÉRENCE SILK:
-  40k mots   = ~160 pages   (novella courte)
-  60k mots   = ~240 pages   (roman court)  
-  80k mots   = ~320 pages   (standard)
-  100k mots  = ~400 pages   (gros roman)
-  120k mots  = ~480 pages   (très gros roman)
-  
-SILK analyse intelligemment votre progression.
-HELP
-                return 0
-                ;;
-            -t|--target)
-                target_words="$2"
-                shift 2
-                ;;
-            --summary)
-                show_details=false
-                shift
-                ;;
-            --no-projections)
-                show_projections=false
-                shift
-                ;;
-            -*)
-                log_error "Option inconnue: $1"
-                return 1
-                ;;
-            *)
-                if [[ "$1" =~ ^[0-9]+$ ]]; then
-                    target_words="$1"
-                fi
-                shift
-                ;;
-        esac
-    done
-    
-    log_info "🕸️ SILK analyse votre progression (objectif: $target_words mots)"
-    
-    analyze_silk_wordcount "$target_words" "$show_details" "$show_projections"
-}
-
-analyze_silk_wordcount() {
-    local target_words="$1"
-    local show_details="$2"
-    local show_projections="$3"
-    
-    local total_words=0
-    local chapter_count=0
-    local min_words=999999
-    local max_words=0
-    local min_chapter=""
-    local max_chapter=""
-    local chapter_data=()
-    
-    # Collecte des données
-    for file in 01-Manuscrit/Ch*.md; do
-        if [[ -f "$file" ]]; then
-            local chapter_name=$(basename "$file" .md)
-            local chapter_title=$(head -n1 "$file" | sed 's/^#*\s*//')
-            
-            # Extraire contenu après "## manuscrit"
-            local words=0
-            if grep -q "$VAULT_MARKER" "$file"; then
-                words=$(sed -n "/$VAULT_MARKER/,\$p" "$file" | tail -n +2 | wc -w)
-            fi
-            
-            if [[ $words -gt 0 ]]; then
-                ((chapter_count++))
-                total_words=$((total_words + words))
-                
-                chapter_data+=("$chapter_name:$words:$chapter_title")
-                
-                if [[ $words -lt $min_words ]]; then
-                    min_words=$words
-                    min_chapter="$chapter_name"
-                fi
-                
-                if [[ $words -gt $max_words ]]; then
-                    max_words=$words
-                    max_chapter="$chapter_name"
-                fi
-            fi
-        fi
-    done
-    
-    if [[ $chapter_count -eq 0 ]]; then
-        log_warning "Aucun chapitre avec contenu trouvé"
-        echo "💡 Ajoutez du contenu après '$VAULT_MARKER' dans vos chapitres"
-        return
-    fi
-    
-    # Affichage détaillé
-    if [[ "$show_details" == "true" ]]; then
-        echo
-        echo "┌─────────┬─────────┬───────────────────────────────────────────────────────┐"
-        echo "│ CHAPITRE│  MOTS   │ TITRE                                                 │"
-        echo "├─────────┼─────────┼───────────────────────────────────────────────────────┤"
-        
-        for data in "${chapter_data[@]}"; do
-            IFS=':' read -r chapter_name words chapter_title <<< "$data"
-            
-            # Tronquer titre si trop long
-            local display_title="${chapter_title:0:53}"
-            if [[ ${#chapter_title} -gt 53 ]]; then
-                display_title="${display_title}..."
-            fi
-            
-            printf "│  %-6s │ %6s  │ %-53s │\n" "$chapter_name" "$words" "$display_title"
-        done
-        
-        echo "└─────────┴─────────┴───────────────────────────────────────────────────────┘"
-        echo
-    fi
-    
-    # Statistiques globales
-    local avg_words=$((total_words / chapter_count))
-    local words_needed=$((target_words - total_words))
-    
-    echo "🕷️ SILK ANALYTICS - STATISTIQUES GLOBALES"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Total chapitres écrits    : $chapter_count"
-    echo "Total mots manuscrit      : $total_words"
-    echo "Moyenne actuelle/chapitre : $avg_words mots"
-    if [[ "$show_details" == "true" ]]; then
-        echo "Chapitre le plus court    : $min_chapter ($min_words mots)"
-        echo "Chapitre le plus long     : $max_chapter ($max_words mots)"
-    fi
-    echo
-    
-    # Projections vers objectif
-    if [[ "$show_projections" == "true" ]]; then
-        if [[ $words_needed -gt 0 ]]; then
-            local words_per_chapter=$((words_needed / chapter_count))
-            local target_avg=$((target_words / chapter_count))
-            local current_pages=$((total_words / 250))
-            local target_pages=$((target_words / 250))
-            
-            echo "🎯 SILK PROJECTIONS - OBJECTIF $target_words MOTS"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "Objectif configuré        : $target_words mots (~$target_pages pages)"
-            echo "Mots à ajouter            : $words_needed mots"
-            echo "Mots à ajouter/chapitre   : +$words_per_chapter mots"
-            echo "Moyenne cible/chapitre    : $target_avg mots"
-            echo
-            
-            # Recommandations SILK
-            if [[ $words_per_chapter -lt 300 ]]; then
-                echo "✅ SILK Évaluation: Objectif très réalisable (+$words_per_chapter mots/chapitre)"
-                echo "   💡 Suggestion: Développez les scènes existantes"
-            elif [[ $words_per_chapter -lt 600 ]]; then
-                echo "🟡 SILK Évaluation: Effort modéré (+$words_per_chapter mots/chapitre)"
-                echo "   💡 Suggestion: Ajoutez sous-trames et développement personnages"
-            elif [[ $words_per_chapter -lt 1000 ]]; then
-                echo "🟠 SILK Évaluation: Effort important (+$words_per_chapter mots/chapitre)"
-                echo "   💡 Suggestion: Enrichissez descriptions et dialogues"
-            else
-                echo "🔥 SILK Évaluation: Effort très important (+$words_per_chapter mots/chapitre)"
-                echo "   💡 Suggestion: Considérez ajouter de nouveaux chapitres"
-                echo "   🎯 Alternative: Révisez l'objectif à $((total_words + chapter_count * 800)) mots"
-            fi
-        else
-            echo "🎉 SILK SUCCESS - OBJECTIF ATTEINT !"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "Objectif configuré        : $target_words mots"
-            echo "Dépassement               : $((-words_needed)) mots"
-            echo "🏆 Félicitations ! Temps de peaufiner et publier."
-        fi
-    fi
-    
-    # Position dans les seuils
-    echo
-    echo "📖 SILK POSITIONNEMENT - STANDARDS ÉDITORIAUX"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# === SILK SIGNATURE ===
+# 🕷️ SILK v1.0.0 - Smart Integrated Literary Kit
+# Structured Intelligence for Literary Kreation  
+# Built with ❤️ by authors, for authors
+# SILK weaves your story together
