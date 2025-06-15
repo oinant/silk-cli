@@ -1,4 +1,4 @@
-# 🕷️ SILK - Smart Integrated Literary Kit
+# 🕷️ SILK CLI - Smart Integrated Literary Kit
 *Structured Intelligence for Literary Kreation*
 
 Modern CLI workflow for authors with LLM integration.
@@ -7,7 +7,7 @@ Modern CLI workflow for authors with LLM integration.
 
 SILK weaves together all aspects of modern novel writing:
 - **Smart** templates adapted by genre and market
-- **Integrated** workflow from concept to publication  
+- **Integrated** workflow from concept to publication
 - **Literary** focus on sophisticated fiction
 - **Kit** complete toolbox for authors
 
@@ -23,122 +23,172 @@ Just like a spider weaves its web, SILK helps you weave together characters, plo
 # Install SILK
 curl -sSL https://raw.githubusercontent.com/oinant/silk-cli/main/install.sh | bash
 
-# Create new project  
-silk init "My Psychological Thriller"
+# Create new project
+silk init "My Novel"
 
 # Generate LLM context
-silk context "Character development Emma"
+silk context "Character development"
 
 # Track progress
 silk wordcount 80000
 
 # Publish professional PDF
-silk publish -f digital# 🕷️ silk - Nerd Book Author
+silk publish -f digital
+```
 
-CLI pour l'écriture de romans avec intégration LLM moderne.
+## 🏗️ Architecture
 
-## 🚀 Installation rapide
+SILK uses a modular architecture for maintainability and extensibility:
 
-```bash
-# Installation directe
-curl -o silk https://raw.githubusercontent.com/oinant/silk-cli/main/silk
-chmod +x silk
-sudo mv silk /usr/local/bin/
-
-# Ou via script
-curl -sSL https://raw.githubusercontent.com/oinant/silk-cli/main/install.sh | bash
+```
+silk-cli/
+├── silk                    # Main script (loads modules)
+├── lib/
+│   ├── core/              # Core modules (auto-loaded)
+│   │   ├── utils.sh       # Utility functions
+│   │   ├── config.sh      # Configuration management
+│   │   └── vault.sh       # Project management
+│   ├── commands/          # Command modules
+│   │   ├── init.sh        # silk init
+│   │   ├── context.sh     # silk context
+│   │   ├── wordcount.sh   # silk wordcount
+│   │   └── publish.sh     # silk publish
+│   └── templates/         # Genre templates
+│       ├── polar.sh       # Crime/thriller templates
+│       └── fantasy.sh     # Fantasy templates
+├── install.sh             # Modular installer
+└── tests/                 # Test suite
 ```
 
 ## 💡 Usage
 
 ```bash
-# Créer nouveau projet
-silk init "Mon Roman Polar"
+# Create new project
+silk init "My Novel"
 
-# Dans le projet  
-silk context "Question pour Claude"
-silk wordcount 80000
-silk publish -f iphone
+# In project directory
+silk context "Question for Claude"    # Generate LLM context
+silk wordcount 80000                  # Progress statistics
+silk publish -f iphone                # Generate PDF
 ```
 
-## 🎯 Fonctionnalités
+## 🎯 Features
 
-- ✅ Générateur projets par genre (polar, fantasy, romance)
-- ✅ Templates adaptés par marché (FR, US, UK, DE)
-- ✅ Contexte LLM optimisé (Claude, GPT, etc.)
-- ✅ Publication PDF multi-format
-- ✅ Statistiques progression avancées
-- ✅ Compatible Windows/Linux/macOS
+- ✅ **Smart Templates** : Project generators by genre (crime, fantasy, romance)
+- ✅ **Integrated Workflow** : From idea to PDF in 4 commands
+- ✅ **Literary Focus** : Templates adapted by market (FR, US, UK, DE)
+- ✅ **Kit Complete** : LLM context + statistics + publishing
+- ✅ **Multi-Platform** : Compatible Windows/Linux/macOS
 
-## 📚 Workflow typique
+## 📚 Typical Workflow
 
-1. **Création** : `silk init "Projet"` → Structure complète générée
-2. **Rédaction** : Écrire dans `01-Manuscrit/Ch*.md`
-3. **Analyse** : `silk context "Question"` → Contexte pour LLM
-4. **Suivi** : `silk wordcount` → Stats progression
-5. **Publication** : `silk publish` → PDF professionnel
+1. **🕷️ Weaving** : `silk init "Project"` → Complete structure generated
+2. **✍️ Writing** : Write in `01-Manuscrit/Ch*.md` with `## manuscrit`
+3. **🧠 Analysis** : `silk context "Question"` → Context for LLM
+4. **📊 Tracking** : `silk wordcount` → Intelligent progress stats
+5. **📖 Publishing** : `silk publish` → Professional multi-format PDF
 
-## 🌍 Support multilingue
+## 🤖 LLM Integration
 
-- **Français** : Polar parisien, marché hexagonal
-- **Anglais** : Crime thriller, marchés US/UK  
-- **Allemand** : Krimi, marché DACH
-- **Espagnol** : Thriller, marchés ES/LATAM
+### Standard SILK separator
+```markdown
+# Ch.15 : Title
 
-## 🎭 Genres supportés
+## SILK Objectives
+- Metadata for planning...
 
-### Polar psychologique (🇫🇷 spécialité)
-- Templates enquête/révélations
-- Structure trilogique 
-- Public cible femmes CSP+ 35-55
+## manuscrit
+[Pure content analyzed by LLM]
+```
 
-### Fantasy/Fantastique
-- Système worldbuilding
-- Templates magie/peuples
-- Cohérence narrative
+### Intelligent context
+```bash
+silk context "Coherence Emma" -ch 15,18,20-25  # Flexible range
+silk context --full --wordcount                # Complete mode + stats
+```
 
-### Romance/Sentimental  
-- Arc relationnel structuré
-- Développement émotionnel
-- Marché $1.44B (US)
+## 🛠️ Development
+
+### Adding New Modules
+
+1. Create module in appropriate directory (`lib/core/`, `lib/commands/`, `lib/templates/`)
+2. Follow naming convention: `cmd_<name>()` for commands
+3. Export functions and set `readonly SILK_MODULE_<NAME>_LOADED=true`
+4. Test with `./tests/test-modular-compatibility.sh`
+
+### Module Dependencies
+
+```bash
+# In module file
+if [[ "${SILK_CORE_UTILS_LOADED:-false}" != "true" ]]; then
+    echo "❌ Module core/utils required" >&2
+    exit 1
+fi
+```
+
+## 🧪 Testing
+
+```bash
+# Basic compatibility
+./tests/test-modular-compatibility.sh
+
+# Full test suite
+./tests/silk_master_test_suite.sh
+
+# Platform compatibility
+./tests/test-compatibility.sh
+```
+
+## 🌍 Supported Genres
+
+### Crime/Thriller (🇫🇷 specialty)
+- Investigation/revelation structured templates
+- Target audience women CSP+ 35-55
+- Specialized LLM prompts for investigation
+
+### Fantasy/Romance
+- Coherent worldbuilding (fantasy)
+- Authentic relationship arcs (romance)
+- Templates adapted for international markets
 
 ## 🛠️ Technologies
 
-- **Core** : Bash portable (Windows Git Bash compatible)
-- **Publication** : Pandoc + XeLaTeX
-- **Future** : Migration .NET Core prévue
-- **LLM** : Intégration multi-provider
-
-## 📖 Documentation
-
-- [Guide Installation](docs/install.md)
-- [Templates par Genre](docs/genres.md) 
-- [Intégration LLM](docs/llm.md)
-- [Publication PDF](docs/publish.md)
-- [Contribution](CONTRIBUTING.md)
-
-## 🤝 Contribution
-
-Basé sur un workflow d'auteur réel avec 30+ chapitres, 450 pages, pipeline LLM optimisé.
-
-1. Fork le projet
-2. Créer branche feature (`git checkout -b feature/amazing`)
-3. Commit (`git commit -m 'Add amazing feature'`)
-4. Push (`git push origin feature/amazing`)
-5. Créer Pull Request
+- **Core** : Portable Bash (Windows Git Bash compatible)
+- **Publishing** : Pandoc + XeLaTeX for professional PDF
+- **Future** : .NET Core migration planned (GUI)
+- **LLM** : Multi-provider (Claude, GPT, etc.)
 
 ## 📈 Roadmap
 
-- [x] **v1.0** : CLI bash unifié
-- [ ] **v1.1** : Support multilingue complet
-- [ ] **v1.2** : Templates genre étendus
-- [ ] **v2.0** : Version .NET Core + GUI
-- [ ] **v2.1** : Intégration cloud/collaboration
+- [x] **v1.0** : Modular CLI Smart Integrated Literary Kit
+- [ ] **v1.1** : Complete multilingual support + extended genre templates
+- [ ] **v1.2** : Advanced progression analytics + market metrics
+- [ ] **v2.0** : .NET Core version + GUI + cloud integration
+- [ ] **v2.1** : Integrated AI + personalized writing coaching
 
-## 📊 Stats projet
+## 🤝 Contributing
+
+Based on real author workflow with 30+ chapters, 450 pages, optimized LLM pipeline.
+
+SILK was born from the concrete need to optimize modern writing with AI.
+
+1. Fork the project
+2. Create feature branch (`git checkout -b feature/silk-amazing`)
+3. Commit (`git commit -m 'Add SILK amazing feature'`)
+4. Push (`git push origin feature/silk-amazing`)
+5. Create Pull Request
+
+## 📊 Project Stats
 
 ![GitHub stars](https://img.shields.io/github/stars/oinant/silk-cli)
 ![GitHub downloads](https://img.shields.io/github/downloads/oinant/silk-cli/total)
 ![GitHub issues](https://img.shields.io/github/issues/oinant/silk-cli)
 
-Généré avec ❤️ par un auteur pour les auteurs.
+## 🕷️ Philosophy
+
+*"Just like a spider weaves its web, SILK helps you weave together characters, plot, and narrative into compelling fiction."*
+
+**SILK weaves your story together.**
+
+Generated with ❤️ by an author for authors.
+*Smart Integrated Literary Kit - Structured Intelligence for Literary Kreation*

@@ -24,7 +24,7 @@ silk_config_load() {
 
 silk_config_save() {
     ensure_directory "$(dirname "$SILK_CONFIG")"
-    
+
     cat > "$SILK_CONFIG" << EOF
 # SILK Configuration - Smart Integrated Literary Kit
 # Généré automatiquement le $(date)
@@ -42,7 +42,7 @@ SILK_DEBUG="${SILK_DEBUG:-false}"
 SILK_HOME="$SILK_HOME"
 SILK_LIB_DIR="$SILK_LIB_DIR"
 EOF
-    
+
     log_debug "Configuration sauvegardée: $SILK_CONFIG"
 }
 
@@ -55,7 +55,7 @@ silk_config_init() {
     SILK_DEFAULT_FORMAT="digital"
     SILK_AUTHOR_NAME=""
     SILK_AUTHOR_PSEUDO=""
-    
+
     silk_config_save
 }
 
@@ -63,7 +63,7 @@ silk_config_reset() {
     if [[ -f "$SILK_CONFIG" ]]; then
         backup_file "$SILK_CONFIG"
     fi
-    
+
     silk_config_init
     log_success "Configuration SILK réinitialisée"
 }
@@ -71,7 +71,7 @@ silk_config_reset() {
 # === GETTERS/SETTERS ===
 silk_config_get() {
     local key="$1"
-    
+
     case "$key" in
         SILK_DEFAULT_GENRE) echo "$SILK_DEFAULT_GENRE" ;;
         SILK_DEFAULT_LANGUAGE) echo "$SILK_DEFAULT_LANGUAGE" ;;
@@ -90,10 +90,10 @@ silk_config_get() {
 silk_config_set() {
     local key="$1"
     local value="$2"
-    
+
     # Charger config actuelle
     silk_config_load || true
-    
+
     # Valider et définir
     case "$key" in
         SILK_DEFAULT_GENRE)
@@ -150,7 +150,7 @@ silk_config_set() {
             return 1
             ;;
     esac
-    
+
     # Sauvegarder
     silk_config_save
     log_success "Configuration mise à jour: $key=$value"
@@ -159,7 +159,7 @@ silk_config_set() {
 silk_config_list() {
     # Charger config actuelle
     silk_config_load || true
-    
+
     echo "🕷️ Configuration SILK - Smart Integrated Literary Kit"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "Genre par défaut        : ${SILK_DEFAULT_GENRE:-non défini}"
@@ -180,25 +180,25 @@ silk_config_list() {
 # === VALIDATION CONFIGURATION ===
 silk_config_validate() {
     local errors=0
-    
+
     # Vérifier genres valides
     if ! is_valid_genre "$SILK_DEFAULT_GENRE"; then
         log_error "Genre par défaut invalide: $SILK_DEFAULT_GENRE"
         ((errors++))
     fi
-    
+
     # Vérifier word count
     if ! is_valid_word_count "$SILK_DEFAULT_TARGET_WORDS"; then
         log_error "Objectif mots invalide: $SILK_DEFAULT_TARGET_WORDS"
         ((errors++))
     fi
-    
+
     # Vérifier nombre chapitres
     if [[ ! "$SILK_DEFAULT_CHAPTERS" =~ ^[0-9]+$ ]] || [[ "$SILK_DEFAULT_CHAPTERS" -lt 1 ]] || [[ "$SILK_DEFAULT_CHAPTERS" -gt 100 ]]; then
         log_error "Nombre chapitres invalide: $SILK_DEFAULT_CHAPTERS"
         ((errors++))
     fi
-    
+
     if [[ $errors -eq 0 ]]; then
         log_success "Configuration SILK valide"
         return 0
@@ -211,7 +211,7 @@ silk_config_validate() {
 # === EXPORT CONFIGURATION ===
 silk_config_export() {
     local format="${1:-env}"
-    
+
     case "$format" in
         env)
             echo "# SILK Environment Variables"
@@ -231,4 +231,61 @@ silk_config_export() {
     "genre": "$SILK_DEFAULT_GENRE",
     "language": "$SILK_DEFAULT_LANGUAGE",
     "target_words": $SILK_DEFAULT_TARGET_WORDS,
-    "chapters": $SILK_DEFAULT_
+    "chapters": $SILK_DEFAULT_CHAPTERS,
+    "format": "$SILK_DEFAULT_FORMAT",
+    "author_name": "$SILK_AUTHOR_NAME",
+    "author_pseudo": "$SILK_AUTHOR_PSEUDO"
+  }
+}
+EOF
+            ;;
+        *)
+            log_error "Format export inconnu: $format (env, json)"
+            return 1
+            ;;
+    esac
+}
+
+# === PROFILS CONFIGURATION ===
+silk_config_profile_save() {
+    local profile_name="$1"
+    local profile_file="$SILK_HOME/profiles/$profile_name.conf"
+
+    ensure_directory "$(dirname "$profile_file")"
+    cp "$SILK_CONFIG" "$profile_file"
+    log_success "Profil sauvegardé: $profile_name"
+}
+
+silk_config_profile_load() {
+    local profile_name="$1"
+    local profile_file="$SILK_HOME/profiles/$profile_name.conf"
+
+    if [[ -f "$profile_file" ]]; then
+        backup_file "$SILK_CONFIG"
+        cp "$profile_file" "$SILK_CONFIG"
+        silk_config_load
+        log_success "Profil chargé: $profile_name"
+    else
+        log_error "Profil non trouvé: $profile_name"
+        return 1
+    fi
+}
+
+silk_config_profile_list() {
+    local profiles_dir="$SILK_HOME/profiles"
+
+    if [[ -d "$profiles_dir" ]]; then
+        echo "🕷️ Profils SILK disponibles:"
+        for profile in "$profiles_dir"/*.conf; do
+            if [[ -f "$profile" ]]; then
+                local name=$(basename "$profile" .conf)
+                echo "   📋 $name"
+            fi
+        done
+    else
+        echo "Aucun profil sauvegardé"
+    fi
+}
+
+# === MARQUER MODULE CHARGÉ ===
+readonly SILK_CORE_CONFIG_LOADED=true
