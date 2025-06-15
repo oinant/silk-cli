@@ -13,6 +13,10 @@ SILK_HOME="${SILK_HOME:-$HOME/.silk}"
 SILK_CONFIG="$SILK_HOME/config"
 VAULT_MARKER="## manuscrit"
 
+# Détection du répertoire lib/
+SILK_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SILK_LIB_DIR="${SILK_LIB_DIR:-$SILK_SCRIPT_DIR/lib}"
+
 # === COULEURS ===
 if [[ -t 1 ]]; then
     RED='\033[0;31m'
@@ -26,13 +30,108 @@ else
     RED='' GREEN='' YELLOW='' BLUE='' PURPLE='' CYAN='' NC=''
 fi
 
-# === FONCTIONS UTILITAIRES ===
+# === FONCTIONS UTILITAIRES DE BASE ===
 log_info() { echo -e "${BLUE}[INFO] $1${NC}"; }
 log_success() { echo -e "${GREEN}[OK] $1${NC}"; }
 log_warning() { echo -e "${YELLOW}[WARN] $1${NC}"; }
 log_error() { echo -e "${RED}[ERROR] $1${NC}"; }
 log_header() { echo -e "${PURPLE}[SILK] $1${NC}"; }
+log_debug() {
+    if [[ "${SILK_DEBUG:-false}" == "true" ]]; then
+        echo -e "${CYAN}[DEBUG] $1${NC}" >&2
+    fi
+}
 
+# === SYSTÈME DE CHARGEMENT MODULAIRE ===
+silk_module_loaded=()
+
+load_module() {
+    local module_path="$1"
+    local module_file=""
+
+    # Résoudre le chemin du module
+    if [[ "$module_path" == /* ]]; then
+        # Chemin absolu
+        module_file="$module_path"
+    elif [[ "$module_path" == */* ]]; then
+        # Chemin relatif depuis SILK_LIB_DIR
+        module_file="$SILK_LIB_DIR/$module_path"
+    else
+        # Nom de module simple - chercher dans core/ puis commands/
+        if [[ -f "$SILK_LIB_DIR/core/$module_path" ]]; then
+            module_file="$SILK_LIB_DIR/core/$module_path"
+        elif [[ -f "$SILK_LIB_DIR/commands/$module_path" ]]; then
+            module_file="$SILK_LIB_DIR/commands/$module_path"
+        else
+            module_file="$SILK_LIB_DIR/$module_path"
+        fi
+    fi
+
+    # Vérifier existence
+    if [[ ! -f "$module_file" ]]; then
+        log_error "Module non trouvé: $module_file"
+        return 1
+    fi
+
+    # Vérifier si déjà chargé
+    local module_name=$(basename "$module_file")
+    for loaded in "${silk_module_loaded[@]}"; do
+        if [[ "$loaded" == "$module_name" ]]; then
+            log_debug "Module déjà chargé: $module_name"
+            return 0
+        fi
+    done
+
+    # Charger le module
+    log_debug "Chargement module: $module_file"
+
+    if source "$module_file"; then
+        silk_module_loaded+=("$module_name")
+        log_debug "Module chargé avec succès: $module_name"
+        return 0
+    else
+        log_error "Erreur lors du chargement: $module_file"
+        return 1
+    fi
+}
+
+load_core_modules() {
+    local required_modules=(
+        "utils.sh"
+        "config.sh"
+        "vault.sh"
+    )
+
+    log_debug "Chargement modules core..."
+
+    for module in "${required_modules[@]}"; do
+        if ! load_module "core/$module"; then
+            log_error "Impossible de charger le module core requis: $module"
+            log_error "Vérifiez que $SILK_LIB_DIR/core/$module existe"
+            return 1
+        fi
+    done
+
+    log_debug "Modules core chargés avec succès"
+    return 0
+}
+
+load_command_module() {
+    local command="$1"
+    local module_file="commands/${command}.sh"
+
+    log_debug "Chargement module commande: $command"
+
+    if load_module "$module_file"; then
+        return 0
+    else
+        log_error "Module commande non disponible: $command"
+        log_error "Vérifiez que $SILK_LIB_DIR/$module_file existe"
+        return 1
+    fi
+}
+
+# === DÉTECTION ENVIRONNEMENT ===
 detect_os() {
     case "$OSTYPE" in
         msys*|cygwin*|mingw*) echo "windows" ;;
@@ -42,36 +141,30 @@ detect_os() {
     esac
 }
 
-is_silk_project() {
-    [[ -d "01-Manuscrit" && -d "02-Personnages" && -d "04-Concepts" ]]
-}
+check_silk_environment() {
+    log_debug "Vérification environnement SILK..."
 
-find_silk_root() {
-    local current_dir="$PWD"
-    while [[ "$current_dir" != "/" ]]; do
-        if [[ -d "$current_dir/01-Manuscrit" ]]; then
-            echo "$current_dir"
-            return 0
-        fi
-        current_dir="$(dirname "$current_dir")"
-    done
-    return 1
-}
-
-ensure_silk_context() {
-    if ! is_silk_project; then
-        local silk_root
-        if silk_root=$(find_silk_root); then
-            log_info "Projet SILK trouve dans: $silk_root"
-            cd "$silk_root"
-        else
-            log_error "Pas dans un projet SILK. Utilisez 'silk init' pour creer un projet."
-            exit 1
-        fi
+    # Vérifier répertoire lib/
+    if [[ ! -d "$SILK_LIB_DIR" ]]; then
+        log_error "Répertoire lib/ non trouvé: $SILK_LIB_DIR"
+        log_error "SILK doit être exécuté depuis son répertoire d'installation"
+        return 1
     fi
+
+    # Vérifier modules core essentiels
+    local core_modules=("utils.sh" "config.sh" "vault.sh")
+    for module in "${core_modules[@]}"; do
+        if [[ ! -f "$SILK_LIB_DIR/core/$module" ]]; then
+            log_error "Module core manquant: $SILK_LIB_DIR/core/$module"
+            return 1
+        fi
+    done
+
+    log_debug "Environnement SILK valide"
+    return 0
 }
 
-# === GESTION CONFIGURATION ===
+# === GESTION CONFIGURATION (Version simplifiée pour bootstrap) ===
 load_config() {
     mkdir -p "$SILK_HOME"
     if [[ -f "$SILK_CONFIG" ]]; then
@@ -89,7 +182,7 @@ load_config() {
 }
 
 save_config() {
-    cat > "$SILK_CONFIG" << 'CONFIG_EOF'
+    cat > "$SILK_CONFIG" << EOF
 # SILK Configuration - Smart Integrated Literary Kit
 SILK_DEFAULT_GENRE="${SILK_DEFAULT_GENRE:-polar-psychologique}"
 SILK_DEFAULT_LANGUAGE="${SILK_DEFAULT_LANGUAGE:-fr}"
@@ -98,34 +191,38 @@ SILK_DEFAULT_CHAPTERS="${SILK_DEFAULT_CHAPTERS:-30}"
 SILK_DEFAULT_FORMAT="${SILK_DEFAULT_FORMAT:-digital}"
 SILK_AUTHOR_NAME="${SILK_AUTHOR_NAME:-}"
 SILK_AUTHOR_PSEUDO="${SILK_AUTHOR_PSEUDO:-}"
-CONFIG_EOF
+EOF
 }
 
-# === COMMANDE VERSION ===
+# === COMMANDES INTÉGRÉES (pour compatibilité) ===
 cmd_version() {
     echo "SILK v$SILK_VERSION"
     echo "Smart Integrated Literary Kit"
     echo "Structured Intelligence for Literary Kreation"
+    echo ""
+    echo "Architecture: Modulaire ($SILK_LIB_DIR)"
+    echo "OS: $(detect_os)"
+    echo "Modules chargés: ${#silk_module_loaded[@]}"
     return 0
 }
 
-# === COMMANDE CONFIG ===
 cmd_config() {
     load_config
 
     case "${1:-list}" in
         --list|list)
-            echo "SILK Configuration"
-            echo "=================="
-            echo "Genre par defaut        : ${SILK_DEFAULT_GENRE}"
-            echo "Langue par defaut       : ${SILK_DEFAULT_LANGUAGE}"
-            echo "Objectif mots defaut    : ${SILK_DEFAULT_TARGET_WORDS}"
-            echo "Chapitres par defaut    : ${SILK_DEFAULT_CHAPTERS}"
-            echo "Format par defaut       : ${SILK_DEFAULT_FORMAT}"
-            echo "Nom auteur              : ${SILK_AUTHOR_NAME:-non defini}"
-            echo "Pseudonyme auteur       : ${SILK_AUTHOR_PSEUDO:-non defini}"
+            echo "🕷️ SILK Configuration"
+            echo "==================="
+            echo "Genre par défaut        : ${SILK_DEFAULT_GENRE}"
+            echo "Langue par défaut       : ${SILK_DEFAULT_LANGUAGE}"
+            echo "Objectif mots défaut    : ${SILK_DEFAULT_TARGET_WORDS}"
+            echo "Chapitres par défaut    : ${SILK_DEFAULT_CHAPTERS}"
+            echo "Format par défaut       : ${SILK_DEFAULT_FORMAT}"
+            echo "Nom auteur              : ${SILK_AUTHOR_NAME:-non défini}"
+            echo "Pseudonyme auteur       : ${SILK_AUTHOR_PSEUDO:-non défini}"
             echo ""
-            echo "Fichier config          : $SILK_CONFIG"
+            echo "📁 Fichier config       : $SILK_CONFIG"
+            echo "📚 Modules SILK          : $SILK_LIB_DIR"
             ;;
         --set)
             if [[ $# -lt 2 ]] || [[ "$2" != *"="* ]]; then
@@ -139,11 +236,11 @@ cmd_config() {
                 SILK_AUTHOR_NAME) SILK_AUTHOR_NAME="$value" ;;
                 SILK_DEFAULT_GENRE) SILK_DEFAULT_GENRE="$value" ;;
                 SILK_DEFAULT_TARGET_WORDS) SILK_DEFAULT_TARGET_WORDS="$value" ;;
-                *) log_error "Cle inconnue: $key"; return 1 ;;
+                *) log_error "Clé inconnue: $key"; return 1 ;;
             esac
 
             save_config
-            log_success "Configuration mise a jour: $key=$value"
+            log_success "Configuration mise à jour: $key=$value"
             ;;
         --get)
             if [[ $# -lt 2 ]]; then
@@ -154,7 +251,7 @@ cmd_config() {
                 SILK_AUTHOR_NAME) echo "$SILK_AUTHOR_NAME" ;;
                 SILK_DEFAULT_GENRE) echo "$SILK_DEFAULT_GENRE" ;;
                 SILK_DEFAULT_TARGET_WORDS) echo "$SILK_DEFAULT_TARGET_WORDS" ;;
-                *) log_error "Cle inconnue: $2"; return 1 ;;
+                *) log_error "Clé inconnue: $2"; return 1 ;;
             esac
             ;;
         --help|-h)
@@ -169,88 +266,222 @@ cmd_config() {
 }
 
 show_config_help() {
-    cat << 'HELP_EOF'
-SILK CONFIG - Configuration globale
+    cat << 'HELP'
+⚙️ SILK CONFIG - Configuration globale
 
 USAGE:
   silk config [OPTIONS]
 
 OPTIONS:
-  --list                    Afficher toute la configuration (defaut)
-  --set KEY=VALUE          Definir une configuration
+  --list                    Afficher configuration (défaut)
+  --set KEY=VALUE          Définir une configuration
   --get KEY                Afficher une configuration
   -h, --help               Afficher cette aide
 
 EXEMPLES:
   silk config --list
-  silk config --set SILK_AUTHOR_NAME="Jean Dupont"
+  silk config --set SILK_AUTHOR_NAME="Jane Doe"
   silk config --get SILK_DEFAULT_GENRE
 
-CLES DISPONIBLES:
+CLÉS DISPONIBLES:
   SILK_AUTHOR_NAME         Nom de l'auteur
-  SILK_DEFAULT_GENRE       Genre par defaut (polar-psychologique, fantasy, etc.)
-  SILK_DEFAULT_TARGET_WORDS Objectif mots par defaut
-HELP_EOF
+  SILK_DEFAULT_GENRE       Genre par défaut
+  SILK_DEFAULT_TARGET_WORDS Objectif mots par défaut
+HELP
+}
+
+# === COMMANDES MODULAIRES ===
+execute_modular_command() {
+    local command="$1"
+    shift  # Enlever le nom de la commande des arguments
+
+    log_debug "Exécution commande modulaire: $command"
+
+    # Charger le module de la commande
+    if ! load_command_module "$command"; then
+        log_error "Commande '$command' non disponible"
+        log_error "Module $SILK_LIB_DIR/commands/${command}.sh manquant"
+        echo ""
+        echo "💡 Commandes disponibles:"
+        echo "   version    - Afficher version SILK"
+        echo "   config     - Configuration globale"
+        echo ""
+        echo "🚧 Commandes en développement:"
+        echo "   init       - Créer nouveau projet"
+        echo "   context    - Générer contexte LLM"
+        echo "   wordcount  - Statistiques progression"
+        echo "   publish    - Générer PDF"
+        return 1
+    fi
+
+    # Vérifier que la fonction de commande existe
+    local cmd_function="cmd_${command}"
+    if ! declare -f "$cmd_function" > /dev/null; then
+        log_error "Fonction $cmd_function non trouvée dans le module"
+        return 1
+    fi
+
+    # Exécuter la commande
+    log_debug "Appel fonction: $cmd_function"
+    "$cmd_function" "$@"
 }
 
 # === AIDE GÉNÉRALE ===
 show_help() {
     log_header "SILK - Smart Integrated Literary Kit v$SILK_VERSION"
     echo
-    echo "CLI unifie pour l'ecriture de romans avec integration LLM"
+    echo "CLI unifié pour l'écriture de romans avec intégration LLM"
+    echo "Architecture modulaire - Structured Intelligence for Literary Kreation"
     echo
     echo "USAGE:"
     echo "  silk COMMAND [OPTIONS]"
     echo
-    echo "COMMANDES:"
-    echo "  init        Creer un nouveau projet d'ecriture"
-    echo "  context     Generer contexte pour LLM (Claude, GPT, etc.)"
-    echo "  wordcount   Statistiques progression manuscrit"
-    echo "  publish     Generer PDF du manuscrit"
+    echo "COMMANDES DISPONIBLES:"
+    echo "  version     Afficher version et informations système"
     echo "  config      Configuration globale SILK"
-    echo "  version     Afficher version"
+    echo
+    echo "COMMANDES MODULAIRES:"
+
+    # Lister les modules de commandes disponibles
+    local available_commands=()
+    if [[ -d "$SILK_LIB_DIR/commands" ]]; then
+        while IFS= read -r -d '' file; do
+            local cmd_name=$(basename "$file" .sh)
+            available_commands+=("$cmd_name")
+        done < <(find "$SILK_LIB_DIR/commands" -name "*.sh" -print0 2>/dev/null)
+    fi
+
+    if [[ ${#available_commands[@]} -gt 0 ]]; then
+        for cmd in "${available_commands[@]}"; do
+            case "$cmd" in
+                init) echo "  init        Créer un nouveau projet d'écriture" ;;
+                context) echo "  context     Générer contexte pour LLM (Claude, GPT, etc.)" ;;
+                wordcount) echo "  wordcount   Statistiques progression manuscrit" ;;
+                publish) echo "  publish     Générer PDF du manuscrit" ;;
+                *) echo "  $cmd        Module de commande disponible" ;;
+            esac
+        done
+    else
+        echo "  (Aucun module de commande trouvé dans $SILK_LIB_DIR/commands/)"
+    fi
+
     echo
     echo "OPTIONS GLOBALES:"
     echo "  -h, --help  Afficher aide"
+    echo "  --debug     Mode debug avec logs détaillés"
     echo
     echo "EXEMPLES:"
-    echo "  silk init \"Mon Roman\"              # Nouveau projet"
-    echo "  silk context \"Revision ch15\"       # Contexte LLM"
-    echo "  silk wordcount 100000              # Stats avec objectif 100k"
-    echo "  silk publish -f iphone             # PDF format iPhone"
+    echo "  silk version                        # Informations système"
+    echo "  silk config --list                  # Voir configuration"
+    echo "  silk init \"Mon Roman\"              # Nouveau projet (si module dispo)"
+    echo "  silk context \"Révision ch15\"       # Contexte LLM (si module dispo)"
     echo
-    echo "SILK weaves your story together."
+    echo "ENVIRONNEMENT:"
+    echo "  Modules     : $SILK_LIB_DIR"
+    echo "  Config      : $SILK_CONFIG"
+    echo "  OS          : $(detect_os)"
+    echo
+    echo "🕷️ SILK weaves your story together."
+}
+
+# === GESTION ERREURS AVANCÉE ===
+handle_silk_error() {
+    local exit_code=$1
+    local line_number=$2
+    local command="$3"
+
+    log_error "Erreur SILK détectée"
+    log_error "Code sortie: $exit_code"
+    log_error "Ligne: $line_number"
+    log_error "Commande: $command"
+
+    if [[ "${SILK_DEBUG:-false}" == "true" ]]; then
+        echo "=== DEBUG INFO ===" >&2
+        echo "Modules chargés: ${silk_module_loaded[*]}" >&2
+        echo "SILK_LIB_DIR: $SILK_LIB_DIR" >&2
+        echo "PWD: $PWD" >&2
+        echo "=================" >&2
+    fi
+
+    exit $exit_code
 }
 
 # === POINT D'ENTRÉE PRINCIPAL ===
 main() {
-    # Charger configuration au démarrage
+    # Gestion des options globales
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --debug)
+                export SILK_DEBUG=true
+                log_debug "Mode debug activé"
+                shift
+                ;;
+            -h|--help|help)
+                show_help
+                exit 0
+                ;;
+            -*)
+                log_error "Option globale inconnue: $1"
+                echo "Utilisez 'silk --help' pour voir les options disponibles"
+                exit 1
+                ;;
+            *)
+                # C'est une commande, arrêter le parsing des options globales
+                break
+                ;;
+        esac
+    done
+
+    # Vérification environnement
+    if ! check_silk_environment; then
+        log_error "Environnement SILK invalide"
+        exit 1
+    fi
+
+    # Charger configuration
     load_config
 
+    # Charger modules core
+    if ! load_core_modules; then
+        log_warning "Modules core non disponibles, fonctionnalité limitée"
+    fi
+
+    # Installer trap pour gestion d'erreurs
+    trap 'handle_silk_error $? $LINENO "$BASH_COMMAND"' ERR
+
     # Parse commande principale
-    case "${1:-}" in
+    local command="${1:-}"
+    if [[ -z "$command" ]]; then
+        show_help
+        exit 0
+    fi
+
+    shift  # Enlever la commande des arguments
+
+    case "$command" in
         version)
             cmd_version
             ;;
         config)
-            shift
             cmd_config "$@"
             ;;
         init|context|wordcount|publish)
-            log_warning "Commande '$1' pas encore implementee dans cette version de debug"
-            log_info "Commandes disponibles: version, config, --help"
-            exit 1
-            ;;
-        -h|--help|help|"")
-            show_help
+            execute_modular_command "$command" "$@"
             ;;
         *)
-            log_error "Commande inconnue: $1"
-            echo "Utilisez 'silk --help' pour voir les commandes disponibles"
+            log_error "Commande inconnue: $command"
+            echo ""
+            echo "💡 Commandes disponibles: version, config"
+            echo "   Utilisez 'silk --help' pour plus d'informations"
             exit 1
             ;;
     esac
 }
+
+# === EXPORT VARIABLES GLOBALES ===
+export SILK_VERSION SILK_HOME SILK_CONFIG SILK_LIB_DIR VAULT_MARKER
+export -f log_info log_success log_warning log_error log_header log_debug
+export -f load_module detect_os
 
 # Exécution si script appelé directement
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

@@ -34,20 +34,20 @@ ensure_silk_context() {
 # === STRUCTURE PROJET SILK ===
 get_silk_project_info() {
     ensure_silk_context
-    
+
     local project_name=$(basename "$PWD")
     local readme_file="README.md"
     local genre="unknown"
     local author="unknown"
     local target_words="unknown"
-    
+
     # Extraire infos du README si possible
     if [[ -f "$readme_file" ]]; then
         genre=$(grep "^**Genre**:" "$readme_file" | sed 's/^**Genre**: *//' | head -1)
         author=$(grep "^**Auteur**:" "$readme_file" | sed 's/^**Auteur**: *//' | head -1)
         target_words=$(grep "^**Objectif**:" "$readme_file" | sed 's/^**Objectif**: *//' | sed 's/ mots.*//' | head -1)
     fi
-    
+
     echo "project_name:$project_name"
     echo "genre:${genre:-unknown}"
     echo "author:${author:-unknown}"
@@ -57,17 +57,17 @@ get_silk_project_info() {
 # === STATISTIQUES PROJET ===
 get_silk_project_stats() {
     ensure_silk_context
-    
+
     local total_files=0
     local total_chapters=0
     local total_words=0
     local total_characters=0
-    
+
     # Compter fichiers manuscrit
     for file in 01-Manuscrit/*.md; do
         if [[ -f "$file" ]]; then
             ((total_files++))
-            
+
             # Si le fichier a du contenu manuscrit
             if grep -q "$VAULT_MARKER" "$file"; then
                 ((total_chapters++))
@@ -78,7 +78,7 @@ get_silk_project_stats() {
             fi
         fi
     done
-    
+
     echo "files:$total_files"
     echo "chapters:$total_chapters"
     echo "words:$total_words"
@@ -90,9 +90,9 @@ get_silk_project_stats() {
 validate_silk_structure() {
     local errors=0
     local warnings=0
-    
+
     log_info "Validation structure SILK..."
-    
+
     # Répertoires obligatoires
     local required_dirs=(
         "01-Manuscrit"
@@ -102,7 +102,7 @@ validate_silk_structure() {
         "outputs/publish"
         "formats"
     )
-    
+
     for dir in "${required_dirs[@]}"; do
         if [[ -d "$dir" ]]; then
             log_debug "✅ $dir"
@@ -111,7 +111,7 @@ validate_silk_structure() {
             ((errors++))
         fi
     done
-    
+
     # Fichiers recommandés
     local recommended_files=(
         "README.md"
@@ -119,7 +119,7 @@ validate_silk_structure() {
         "formats/digital.yaml"
         ".gitignore"
     )
-    
+
     for file in "${recommended_files[@]}"; do
         if [[ -f "$file" ]]; then
             log_debug "✅ $file"
@@ -128,7 +128,7 @@ validate_silk_structure() {
             ((warnings++))
         fi
     done
-    
+
     # Vérifier contenu manuscrit
     local chapters_with_content=0
     for file in 01-Manuscrit/*.md; do
@@ -136,14 +136,14 @@ validate_silk_structure() {
             ((chapters_with_content++))
         fi
     done
-    
+
     if [[ $chapters_with_content -eq 0 ]]; then
         log_warning "Aucun chapitre avec contenu '## manuscrit' trouvé"
         ((warnings++))
     else
         log_debug "✅ $chapters_with_content chapitres avec contenu"
     fi
-    
+
     # Résumé
     if [[ $errors -eq 0 ]]; then
         log_success "Structure SILK valide ($warnings avertissement(s))"
@@ -157,40 +157,40 @@ validate_silk_structure() {
 # === MAINTENANCE PROJET ===
 silk_project_cleanup() {
     ensure_silk_context
-    
+
     log_info "Nettoyage projet SILK..."
-    
+
     # Nettoyer fichiers temporaires
     find outputs/temp -name "*.tmp" -delete 2>/dev/null || true
     find outputs/temp -name "silk_*" -mtime +7 -delete 2>/dev/null || true
-    
+
     # Nettoyer sauvegardes anciennes
     find . -name "*.backup.*" -mtime +30 -delete 2>/dev/null || true
-    
+
     # Nettoyer cache SILK
     if [[ -d ".silk-cache" ]]; then
         rm -rf .silk-cache
     fi
-    
+
     log_success "Nettoyage terminé"
 }
 
 silk_project_backup() {
     ensure_silk_context
-    
+
     local backup_name="${1:-$(date +%Y%m%d-%H%M%S)}"
     local project_name=$(basename "$PWD")
     local backup_file="${project_name}-backup-${backup_name}.tar.gz"
-    
+
     log_info "Sauvegarde projet SILK: $backup_file"
-    
+
     # Créer archive en excluant outputs/temp et .git
     tar --exclude='outputs/temp' \
         --exclude='.git' \
         --exclude='*.backup.*' \
         --exclude='.silk-cache' \
         -czf "$backup_file" .
-    
+
     log_success "Sauvegarde créée: $backup_file"
     echo "📁 Taille: $(ls -lh "$backup_file" | awk '{print $5}')"
 }
@@ -198,16 +198,16 @@ silk_project_backup() {
 # === MIGRATION PROJETS ===
 migrate_legacy_to_silk() {
     local legacy_dir="$1"
-    
+
     if [[ ! -d "$legacy_dir" ]]; then
         log_error "Répertoire legacy non trouvé: $legacy_dir"
         return 1
     fi
-    
+
     log_info "Migration projet legacy vers SILK: $legacy_dir"
-    
+
     cd "$legacy_dir"
-    
+
     # Créer structure SILK manquante
     local silk_dirs=(
         "00-instructions-llm"
@@ -217,17 +217,17 @@ migrate_legacy_to_silk() {
         "formats"
         "99-Templates"
     )
-    
+
     for dir in "${silk_dirs[@]}"; do
         if [[ ! -d "$dir" ]]; then
             mkdir -p "$dir"
             log_success "Créé: $dir"
         fi
     done
-    
+
     # Convertir chapitres au format SILK
     for file in 01-Manuscrit/*.md; do
-        if [[ -f "$file" && ! grep -q "$VAULT_MARKER" "$file" ]]; then
+        if [[ -f "$file" ]] && ! grep -q "$VAULT_MARKER" "$file"; then
             # Ajouter séparateur manuscrit
             echo "" >> "$file"
             echo "$VAULT_MARKER" >> "$file"
@@ -236,7 +236,7 @@ migrate_legacy_to_silk() {
             log_success "Converti: $(basename "$file")"
         fi
     done
-    
+
     # Créer fichiers SILK essentiels
     if [[ ! -f "formats/base.yaml" ]]; then
         cat > "formats/base.yaml" << 'EOF'
@@ -248,7 +248,7 @@ documentclass: book
 EOF
         log_success "Créé: formats/base.yaml"
     fi
-    
+
     # Créer .gitignore SILK
     if [[ ! -f ".gitignore" ]]; then
         cat > ".gitignore" << 'EOF'
@@ -259,7 +259,7 @@ outputs/temp/
 EOF
         log_success "Créé: .gitignore"
     fi
-    
+
     log_success "Migration vers SILK terminée"
     log_info "💡 Utilisez 'silk debug validate' pour vérifier la structure"
 }
@@ -275,7 +275,7 @@ get_available_templates() {
 
 get_template_description() {
     local template="$1"
-    
+
     case "$template" in
         polar-psychologique)
             echo "Polar sophistiqué avec éléments psychologiques - Public CSP+ 35-55 ans"
