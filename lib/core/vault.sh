@@ -31,6 +31,19 @@ ensure_silk_context() {
     fi
 }
 
+# === EXTRACTION CONTENU ===
+extract_manuscript_content() {
+    local file="$1"
+    local marker="${2:-## manuscrit}"
+
+    if grep -q "$marker" "$file"; then
+        sed -n "/$marker/,\$p" "$file" | tail -n +2
+    else
+        log_warning "Fichier sans séparateur: $(basename "$file")"
+        return 1
+    fi
+}
+
 # === STRUCTURE PROJET SILK ===
 get_silk_project_info() {
     ensure_silk_context

@@ -170,7 +170,7 @@ echo "✅ Contenu de test créé"
 # Test génération contexte normal
 echo
 echo "🧠 Test 1: Contexte normal"
-if ./silk context "Analyse cohérence Ch1-2" --chapters 1-2; then
+if ../silk context "Analyse cohérence Ch1-2" --chapters 1-2; then
     echo "✅ Génération contexte normale"
 else
     echo "❌ Échec contexte normal"
@@ -179,26 +179,19 @@ fi
 # Vérifier fichiers générés
 echo
 echo "📄 Vérification fichiers générés:"
-if [[ -f "outputs/context/manuscrit.md" ]]; then
-    echo "✅ manuscrit.md généré"
-    word_count=$(wc -w < "outputs/context/manuscrit.md")
+if [[ -f "outputs/context/silk-context.md" ]]; then
+    echo "✅ silk-context.md généré"
+    word_count=$(wc -w < "outputs/context/silk-context.md")
     echo "   📊 $word_count mots"
 else
-    echo "❌ manuscrit.md manquant"
+    echo "❌ silk-context.md manquant"
 fi
 
-if [[ -f "outputs/context/sharedcontext.md" ]]; then
-    echo "✅ sharedcontext.md généré"
-    context_size=$(wc -w < "outputs/context/sharedcontext.md")
-    echo "   📊 $context_size mots"
-else
-    echo "❌ sharedcontext.md manquant"
-fi
 
 # Test mode complet
 echo
 echo "🧠 Test 2: Contexte complet"
-if ./silk context "Analyse complète" --full --wordcount; then
+if ../silk context "Analyse complète" --mode full --wordcount; then
     echo "✅ Génération contexte complète"
 else
     echo "❌ Échec contexte complet"
@@ -207,7 +200,7 @@ fi
 # Test range complexe
 echo
 echo "🧠 Test 3: Range complexe"
-if ./silk context "Test range" --chapters 1,2 --combined; then
+if ../silk context "Test range" --chapters 1,2; then
     echo "✅ Range complexe + fichier combiné"
 else
     echo "❌ Échec range complexe"
@@ -216,13 +209,13 @@ fi
 # Vérifier contenu contexte
 echo
 echo "🔍 Vérification contenu contexte:"
-if grep -q "Claire Moreau" "outputs/context/manuscrit.md"; then
+if grep -q "Claire Moreau" "outputs/context/silk-context.md"; then
     echo "✅ Contenu chapitre extrait"
 else
     echo "❌ Contenu chapitre manquant"
 fi
 
-if grep -q "SILK" "outputs/context/sharedcontext.md"; then
+if grep -q "SILK" "outputs/context/silk-context.md"; then
     echo "✅ Branding SILK dans contexte"
 else
     echo "❌ Branding SILK manquant"

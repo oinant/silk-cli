@@ -36,10 +36,9 @@ cmd_context() {
     local mode="normal"
     local include_timeline=false
     local include_wordcount=false
+    local timeline_file=""
+    local backstory_file=""
     local prompt_file="prompt.md"
-
-    # Vérifier contexte vault
-    ensure_silk_context
 
     # Parser arguments pour détecter le mode prompt
     while [[ $# -gt 0 ]]; do
@@ -84,21 +83,42 @@ cmd_context() {
                 log_debug "Range chapitres: $chapter_range"
                 shift 2
                 ;;
-            --full)
-                mode="full"
-                chapter_range="all"
-                log_debug "Mode full activé"
-                shift
-                ;;
-            --timeline)
+            --timeline|-tl)
                 include_timeline=true
-                log_debug "Timeline incluse"
-                shift
+                if [[ -n "$2" && "$2" != -* ]]; then
+                    timeline_file="$2"
+                    shift 2
+                else
+                    shift
+                fi
+                log_debug "Timeline incluse: ${timeline_file:-auto}"
                 ;;
-            --wc|--wordcount)
+            --wordcount|-wc)
                 include_wordcount=true
                 log_debug "Word count inclus"
                 shift
+                ;;
+            --mode)
+                mode="$2"
+                case "$mode" in
+                    nocontext|normal|full) ;;
+                    *)
+                        log_error "Mode invalide: $mode (nocontext, normal, full)"
+                        return 1
+                        ;;
+                esac
+                log_debug "Mode contexte: $mode"
+                shift 2
+                ;;
+            --backstory)
+                if [[ -n "$2" && "$2" != -* ]]; then
+                    backstory_file="$2"
+                    shift 2
+                else
+                    # Chercher fichier backstory par défaut
+                    shift
+                fi
+                log_debug "Backstory: ${backstory_file:-auto}"
                 ;;
             -*)
                 log_error "Option inconnue: $1"
@@ -126,6 +146,9 @@ cmd_context() {
         return 1
     fi
 
+    # Vérifier contexte vault
+    ensure_silk_context
+
     # Normaliser le range
     local original_range="$chapter_range"
     chapter_range=$(normalize_chapter_range "$chapter_range")
@@ -134,17 +157,22 @@ cmd_context() {
         log_debug "Range normalisé: $original_range -> $chapter_range"
     fi
 
+    # Auto-détection fichiers si non spécifiés
+    auto_detect_context_files timeline_file backstory_file
+
     # Générer contexte unifié
     local start_time=$(start_timer)
 
     log_info "🕸️ SILK tisse votre contexte unifié..."
 
-    generate_unified_context "$prompt_text" "$prompt_source" "$chapter_range" "$mode" "$include_timeline" "$include_wordcount" "$original_range"
+    generate_unified_context "$prompt_text" "$prompt_source" "$chapter_range" "$mode" "$include_timeline" "$include_wordcount" "$timeline_file" "$backstory_file" "$original_range"
 
     local duration=$(end_timer "$start_time")
 
     # Rapport final
     show_unified_report "$mode" "$chapter_range" "$duration" "$prompt_source"
+
+    return 0  # Force success exit code
 }
 
 # === AIDE CONTEXTE ===
@@ -163,10 +191,11 @@ OPTIONS PROMPT:
 
 OPTIONS CONTENU:
   -ch, --chapters RANGE         Chapitres (ex: 1-4, 20,28,30, all)
-  --full                        Mode complet (tous éléments)
-  --timeline                    Inclure timeline
-  --wc, --wordcount            Inclure statistiques mots
-  -h, --help                   Afficher cette aide
+  --mode MODE                   Contexte: nocontext|normal|full
+  --timeline, -tl [FILE]        Inclure timeline (auto-détection)
+  --wordcount, -wc              Inclure statistiques mots
+  --backstory [FILE]            Fichier backstory spécifique
+  -h, --help                    Afficher cette aide
 
 PROMPTS PRÉDÉFINIS:
   coherence     Analyse cohérence narrative et temporelle
@@ -178,12 +207,17 @@ PROMPTS PRÉDÉFINIS:
   continuity    Vérification continuité entre chapitres
   editing       Révision éditoriale complète
 
+MODES CONTEXTE:
+  nocontext     Prompt + manuscrit seulement
+  normal        + personnages principaux + concepts essentiels
+  full          + tous personnages + lieux + worldbuilding + timeline
+
 EXEMPLES:
   silk context "Révise le dialogue d'Emma au chapitre 15"
   silk context -p coherence --chapters 1-10
-  silk context -p characters --full
+  silk context -p characters --mode full
   silk context --withpromptfile analyse-complete.md -ch 20,25,30
-  silk context --withpromptfile --timeline --wc
+  silk context --withpromptfile --timeline --wc --mode full
 
 FORMATS CHAPITRES:
   10-15         Range (10, 11, 12, 13, 14, 15)
@@ -199,6 +233,48 @@ FICHIER GÉNÉRÉ:
 HELP
 }
 
+# === AUTO-DÉTECTION FICHIERS ===
+auto_detect_context_files() {
+    local -n timeline_ref=$1
+    local -n backstory_ref=$2
+
+    # Auto-détection timeline si non spécifiée
+    if [[ -z "$timeline_ref" ]]; then
+        local timeline_candidates=(
+            "07-timeline/timeline-rebuild-4.md"
+            "07-timeline/timeline.md"
+            "timeline.md"
+            "Timeline.md"
+        )
+
+        for candidate in "${timeline_candidates[@]}"; do
+            if [[ -f "$candidate" ]]; then
+                timeline_ref="$candidate"
+                log_debug "Timeline auto-détectée: $candidate"
+                break
+            fi
+        done
+    fi
+
+    # Auto-détection backstory si non spécifiée
+    if [[ -z "$backstory_ref" ]]; then
+        local backstory_candidates=(
+            "backstory.md"
+            "Backstory.md"
+            "04-Concepts/backstory.md"
+            "10-Lore/backstory.md"
+        )
+
+        for candidate in "${backstory_candidates[@]}"; do
+            if [[ -f "$candidate" ]]; then
+                backstory_ref="$candidate"
+                log_debug "Backstory auto-détectée: $candidate"
+                break
+            fi
+        done
+    fi
+}
+
 # === GÉNÉRATION CONTEXTE UNIFIÉ ===
 generate_unified_context() {
     local prompt_text="$1"
@@ -207,7 +283,9 @@ generate_unified_context() {
     local mode="$4"
     local include_timeline="$5"
     local include_wordcount="$6"
-    local original_range="$7"
+    local timeline_file="$7"
+    local backstory_file="$8"
+    local original_range="$9"
 
     ensure_directory "$CONTEXT_OUTPUT_DIR"
 
@@ -235,10 +313,12 @@ generate_unified_context() {
     } > "$output_file"
 
     # === 2. CONTEXTE MÉTADONNÉES ===
-    add_unified_context "$output_file" "$mode" "$chapter_range"
+    if [[ "$mode" != "nocontext" ]]; then
+        add_unified_context "$output_file" "$mode" "$chapter_range" "$timeline_file" "$backstory_file"
+    fi
 
     # === 3. MANUSCRIT ===
-    add_unified_manuscript "$output_file" "$chapter_range" "$include_timeline" "$include_wordcount"
+    add_unified_manuscript "$output_file" "$chapter_range" "$include_timeline" "$include_wordcount" "$timeline_file"
 
     log_success "Contexte unifié généré: $output_file"
 }
@@ -248,6 +328,8 @@ add_unified_context() {
     local output_file="$1"
     local mode="$2"
     local chapter_range="$3"
+    local timeline_file="$4"
+    local backstory_file="$5"
 
     {
         echo "# 🧠 CONTEXTE PROJET"
@@ -260,21 +342,35 @@ add_unified_context() {
         echo
     } >> "$output_file"
 
-    # Concepts
-    add_concepts_section "$output_file"
+    # Backstory (mode normal et full)
+    if [[ "$mode" == "normal" || "$mode" == "full" ]] && [[ -n "$backstory_file" && -f "$backstory_file" ]]; then
+        add_backstory_section "$output_file" "$backstory_file"
+    fi
+
+    # Concepts (mode normal et full)
+    if [[ "$mode" == "normal" || "$mode" == "full" ]]; then
+        add_concepts_section "$output_file"
+    fi
 
     # Personnages selon mode
     add_characters_section "$output_file" "$mode"
 
-    # Timeline
-    add_timeline_section "$output_file" "$mode"
+    # Timeline (mode full seulement)
+    if [[ "$mode" == "full" ]] && [[ -n "$timeline_file" && -f "$timeline_file" ]]; then
+        add_timeline_section "$output_file" "$timeline_file"
+    fi
 
-    # Lieux si mode full
+    # Lieux (mode full seulement)
     if [[ "$mode" == "full" ]]; then
         add_locations_section "$output_file"
     fi
 
-    # Métadonnées chapitres concernés
+    # Worldbuilding (mode full seulement)
+    if [[ "$mode" == "full" ]]; then
+        add_worldbuilding_section "$output_file"
+    fi
+
+    # Métadonnées chapitres concernés (tous modes)
     add_chapter_metadata_section "$output_file" "$chapter_range"
 }
 
@@ -284,6 +380,7 @@ add_unified_manuscript() {
     local chapter_range="$2"
     local include_timeline="$3"
     local include_wordcount="$4"
+    local timeline_file="$5"
 
     {
         echo "---"
@@ -293,8 +390,8 @@ add_unified_manuscript() {
     } >> "$output_file"
 
     # Timeline si demandée
-    if [[ "$include_timeline" == "true" ]]; then
-        add_timeline_to_manuscript "$output_file"
+    if [[ "$include_timeline" == "true" ]] && [[ -n "$timeline_file" && -f "$timeline_file" ]]; then
+        add_timeline_to_manuscript "$output_file" "$timeline_file"
     fi
 
     # Word count si demandé
@@ -312,6 +409,20 @@ add_unified_manuscript() {
 }
 
 # === SECTIONS CONTEXTE ===
+add_backstory_section() {
+    local output_file="$1"
+    local backstory_file="$2"
+
+    {
+        echo "## 📚 Backstory"
+        echo
+        cat "$backstory_file"
+        echo
+    } >> "$output_file"
+
+    log_debug "Backstory ajoutée: $backstory_file"
+}
+
 add_concepts_section() {
     local output_file="$1"
 
@@ -339,23 +450,10 @@ add_characters_section() {
     echo "## 👥 Personnages" >> "$output_file"
     echo >> "$output_file"
 
-    # Trio principal
-    echo "### 🌟 Trio principal" >> "$output_file"
-    for file in 02-Personnages/{Emma,Max,Yasmine}.md; do
-        if [[ -f "$file" ]]; then
-            {
-                echo
-                echo "#### $(basename "$file" .md)"
-                cat "$file"
-                echo
-            } >> "$output_file"
-        fi
-    done
-
-    # Personnages principaux
-    if [[ -d "02-Personnages/Principaux" ]] && [[ $(ls 02-Personnages/Principaux/*.md 2>/dev/null | wc -l) -gt 0 ]]; then
-        echo "### 🎯 Personnages principaux" >> "$output_file"
-        for file in 02-Personnages/Principaux/*.md; do
+    # Trio principal (tous modes sauf nocontext)
+    if [[ "$mode" != "nocontext" ]]; then
+        echo "### 🌟 Trio principal" >> "$output_file"
+        for file in 02-Personnages/{Emma,Max,Yasmine}.md; do
             if [[ -f "$file" ]]; then
                 {
                     echo
@@ -365,6 +463,23 @@ add_characters_section() {
                 } >> "$output_file"
             fi
         done
+    fi
+
+    # Personnages principaux (mode normal et full)
+    if [[ "$mode" == "normal" || "$mode" == "full" ]]; then
+        if [[ -d "02-Personnages/Principaux" ]] && [[ $(ls 02-Personnages/Principaux/*.md 2>/dev/null | wc -l) -gt 0 ]]; then
+            echo "### 🎯 Personnages principaux" >> "$output_file"
+            for file in 02-Personnages/Principaux/*.md; do
+                if [[ -f "$file" ]]; then
+                    {
+                        echo
+                        echo "#### $(basename "$file" .md)"
+                        cat "$file"
+                        echo
+                    } >> "$output_file"
+                fi
+            done
+        fi
     fi
 
     # Personnages secondaires (mode full seulement)
@@ -390,28 +505,16 @@ add_characters_section() {
 
 add_timeline_section() {
     local output_file="$1"
-    local mode="$2"
+    local timeline_file="$2"
 
-    if [[ $(ls 07-timeline/*.md 2>/dev/null | wc -l) -gt 0 ]]; then
-        echo "## 📅 Timeline" >> "$output_file"
-        echo >> "$output_file"
+    {
+        echo "## 📅 Timeline complète"
+        echo
+        cat "$timeline_file"
+        echo
+    } >> "$output_file"
 
-        for file in 07-timeline/*.md; do
-            if [[ -f "$file" ]]; then
-                # En mode normal, exclure tome 2
-                if [[ "$mode" == "normal" ]] && [[ "$(basename "$file")" == *"tome 2"* ]]; then
-                    continue
-                fi
-
-                {
-                    echo "### $(basename "$file" .md)"
-                    echo
-                    cat "$file"
-                    echo
-                } >> "$output_file"
-            fi
-        done
-    fi
+    log_debug "Timeline ajoutée: $timeline_file"
 }
 
 add_locations_section() {
@@ -423,6 +526,44 @@ add_locations_section() {
 
         for file in 03-Lieux/*.md; do
             if [[ -f "$file" ]]; then
+                {
+                    echo "### $(basename "$file" .md)"
+                    echo
+                    cat "$file"
+                    echo
+                } >> "$output_file"
+            fi
+        done
+    fi
+}
+
+add_worldbuilding_section() {
+    local output_file="$1"
+
+    # Worldbuilding pour projets fantasy
+    if [[ -d "05-Worldbuilding" ]] && [[ $(ls 05-Worldbuilding/*.md 2>/dev/null | wc -l) -gt 0 ]]; then
+        echo "## 🌍 Worldbuilding" >> "$output_file"
+        echo >> "$output_file"
+
+        for file in 05-Worldbuilding/*.md; do
+            if [[ -f "$file" ]]; then
+                {
+                    echo "### $(basename "$file" .md)"
+                    echo
+                    cat "$file"
+                    echo
+                } >> "$output_file"
+            fi
+        done
+    fi
+
+    # Lore général
+    if [[ -d "10-Lore" ]] && [[ $(ls 10-Lore/*.md 2>/dev/null | wc -l) -gt 0 ]]; then
+        echo "## 📖 Lore" >> "$output_file"
+        echo >> "$output_file"
+
+        for file in 10-Lore/*.md; do
+            if [[ -f "$file" ]] && [[ "$(basename "$file")" != "anciens_chapitres" ]]; then
                 {
                     echo "### $(basename "$file" .md)"
                     echo
@@ -462,16 +603,16 @@ add_chapter_metadata_section() {
 
 add_timeline_to_manuscript() {
     local output_file="$1"
+    local timeline_file="$2"
 
-    if [[ -f "07-timeline/timeline-rebuild-4.md" ]]; then
-        {
-            echo "## 📅 Timeline principale"
-            echo
-            cat "07-timeline/timeline-rebuild-4.md"
-            echo
-        } >> "$output_file"
-        log_debug "Timeline ajoutée au manuscrit"
-    fi
+    {
+        echo "## 📅 Timeline principale"
+        echo
+        cat "$timeline_file"
+        echo
+    } >> "$output_file"
+
+    log_debug "Timeline ajoutée au manuscrit: $timeline_file"
 }
 
 add_wordcount_to_manuscript() {
