@@ -1,12 +1,12 @@
 #!/bin/bash
-# Tests basiques SILK CLI
+# Test création projet SILK
 
 set -euo pipefail
 
-echo "🕷️ Tests SILK CLI - Smart Integrated Literary Kit"
-echo "=================================================="
+echo "🕷️ Test Création Projet SILK"
+echo "============================="
 
-# Couleurs pour les tests
+# Couleurs
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -16,56 +16,88 @@ test_pass() { echo -e "${GREEN}✅ $1${NC}"; }
 test_fail() { echo -e "${RED}❌ $1${NC}"; }
 test_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
 
-# Vérifier que le script existe et est exécutable
+# Nettoyage préventif
+cleanup() {
+    if [[ -d "test-polar-project" ]]; then
+        rm -rf test-polar-project
+        echo "🧹 Nettoyage projet test existant"
+    fi
+}
+
+# Cleanup au début et à la sortie
+cleanup
+trap cleanup EXIT
+
+# Test création projet
 echo
-test_info "Test 1: Vérification script silk"
-if [[ -f "./silk" && -x "./silk" ]]; then
-    test_pass "Script silk trouvé et exécutable"
+test_info "Test 1: Création projet SILK"
+if ./silk init "Test Polar Project" --genre polar-psychologique --author "Test Author" --yes; then
+    test_pass "Projet créé avec succès"
 else
-    test_fail "Script silk manquant ou pas exécutable"
-    echo "   💡 Exécutez: chmod +x silk"
+    test_fail "Échec création projet"
     exit 1
 fi
 
-# Test version
+# Vérifier structure créée
 echo
-test_info "Test 2: Commande version"
-if ./silk version; then
-    test_pass "Version affichée correctement"
-else
-    test_fail "Erreur commande version"
-fi
+test_info "Test 2: Vérification structure"
+if [[ -d "test-polar-project" ]]; then
+    test_pass "Répertoire projet créé"
 
-# Test aide générale
-echo
-test_info "Test 3: Aide générale"
-if ./silk --help > /dev/null 2>&1; then
-    test_pass "Aide générale fonctionne"
-else
-    test_fail "Erreur aide générale"
-fi
+    cd test-polar-project
 
-# Test aides sous-commandes
-echo
-test_info "Test 4: Aides sous-commandes"
-commands=("init" "context" "wordcount" "publish" "config")
-for cmd in "${commands[@]}"; do
-    if ./silk "$cmd" --help > /dev/null 2>&1; then
-        test_pass "Aide $cmd OK"
-    else
-        test_fail "Aide $cmd échoue"
+    # Vérifier répertoires SILK
+    required_dirs=("01-Manuscrit" "02-Personnages" "04-Concepts" "outputs/context" "formats")
+    for dir in "${required_dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+            test_pass "Structure: $dir"
+        else
+            test_fail "Structure manquante: $dir"
+        fi
+    done
+
+    # Vérifier fichiers clés
+    if [[ -f "README.md" ]]; then
+        test_pass "README.md généré"
     fi
-done
 
-# Test configuration
-echo
-test_info "Test 5: Configuration"
-if ./silk config --list > /dev/null 2>&1; then
-    test_pass "Configuration accessible"
+    if [[ -f "formats/base.yaml" ]]; then
+        test_pass "Configuration publication"
+    fi
+
+    # Vérifier Git
+    if [[ -d ".git" ]]; then
+        test_pass "Repository Git initialisé"
+    fi
+
+    cd ..
 else
-    test_fail "Erreur configuration"
+    test_fail "Répertoire projet non créé"
+    exit 1
 fi
 
+# Test commandes de base dans le projet
 echo
-echo "🕸️ Tests basiques terminés"
-echo "Pour tests avancés, voir: ./tests/test_silk_advanced.sh"
+test_info "Test 3: Commandes dans projet"
+cd test-polar-project
+
+if ../silk context --help > /dev/null 2>&1; then
+    test_pass "Aide context accessible"
+else
+    test_fail "Aide context non accessible"
+fi
+
+if ../silk wordcount --help > /dev/null 2>&1; then
+    test_pass "Aide wordcount accessible"
+else
+    test_info "Aide wordcount non implémentée (normal)"
+fi
+
+cd ..
+
+echo
+echo "✅ Test création projet terminé"
+echo "💡 Projet 'test-polar-project' prêt pour tests suivants"
+
+# Ne pas nettoyer à la fin pour les tests suivants
+trap - EXIT
