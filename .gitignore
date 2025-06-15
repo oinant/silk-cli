@@ -12,9 +12,22 @@ Thumbs.db
 *.swp
 *.swo
 
-# Tests
+# Tests temporaires
 test-output/
 temp-*
+silk-test-suite/        # Dossier test temporaire
+*-test-project/         # Projets de test générés
+test-*/                 # Tous dossiers test-*
+
+# Scripts de debug temporaires
+debug-*.sh
+fix-*.sh
+normalize-scripts.sh
+
+# Backups temporaires
+*.backup
+*.backup.*
+silk.broken.*
 
 # Distribution  
 dist/
@@ -30,3 +43,6 @@ config.local
 # Log files
 *.log
 logs/
+
+# Cache SILK
+.silk-cache/
