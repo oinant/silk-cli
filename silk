@@ -1,76 +1,17 @@
 #!/bin/bash
 
-# 🕷️ SILK - Smart Integrated Literary Kit v1.0
+# SILK - Smart Integrated Literary Kit v1.0
 # Structured Intelligence for Literary Kreation
 # Modern CLI workflow for authors with LLM integration
-# Compatible: Git Bash (Windows), Linux, macOS
+# Compatible: Git Bash (Windows), Linux, macOS, WSL
 
 set -euo pipefail
-
-# === FIX COMPATIBILITÉ WINDOWS/WSL ===
-# Convertir fins de ligne si nécessaire (Windows/WSL)
-if command -v dos2unix &> /dev/null && [[ -f "$0" ]]; then
-    # Vérifier si le script a des CRLF et les convertir silencieusement
-    if file "$0" 2>/dev/null | grep -q "CRLF"; then
-        dos2unix "$0" 2>/dev/null || true
-    fi
-fi
-
-# Détecter l'environnement d'exécution
-detect_environment() {
-    if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
-        echo "wsl"
-    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "mingw"* ]]; then
-        echo "gitbash"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "linux"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
-    else
-        echo "unknown"
-    fi
-}
-
-SILK_ENV=$(detect_environment)
 
 # === CONFIGURATION GLOBALE ===
 SILK_VERSION="1.0.0"
 SILK_HOME="${SILK_HOME:-$HOME/.silk}"
 SILK_CONFIG="$SILK_HOME/config"
-SILK_LIB_DIR="${SILK_LIB_DIR:-$(dirname "${BASH_SOURCE[0]}")/lib}"
 VAULT_MARKER="## manuscrit"
-
-# === DÉTECTION ARCHITECTURE ===
-# Si lib/ existe en local, utiliser version locale
-if [[ -d "$(dirname "${BASH_SOURCE[0]}")/lib" ]]; then
-    SILK_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")/lib"
-# Sinon utiliser installation système
-elif [[ -d "/usr/local/lib/silk" ]]; then
-    SILK_LIB_DIR="/usr/local/lib/silk"
-elif [[ -d "$HOME/.silk/lib" ]]; then
-    SILK_LIB_DIR="$HOME/.silk/lib"
-fi
-
-# === CHARGEMENT MODULES ===
-# Fonction de chargement sécurisé
-load_module() {
-    local module="$1"
-    local module_path="$SILK_LIB_DIR/$module"
-    
-    if [[ -f "$module_path" ]]; then
-        source "$module_path"
-        return 0
-    else
-        echo "❌ Module SILK manquant: $module" >&2
-        echo "💡 Répertoire attendu: $SILK_LIB_DIR" >&2
-        return 1
-    fi
-}
-
-# Charger modules core
-load_module "core/utils.sh" || exit 1
-load_module "core/config.sh" || exit 1
-load_module "core/vault.sh" || exit 1
 
 # === COULEURS ===
 if [[ -t 1 ]]; then
@@ -85,169 +26,233 @@ else
     RED='' GREEN='' YELLOW='' BLUE='' PURPLE='' CYAN='' NC=''
 fi
 
-# === FONCTIONS UTILITAIRES DE BASE ===
-log_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
-log_success() { echo -e "${GREEN}✅ $1${NC}"; }
-log_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
-log_error() { echo -e "${RED}❌ $1${NC}"; }
-log_header() { echo -e "${PURPLE}🕷️  $1${NC}"; }
+# === FONCTIONS UTILITAIRES ===
+log_info() { echo -e "${BLUE}[INFO] $1${NC}"; }
+log_success() { echo -e "${GREEN}[OK] $1${NC}"; }
+log_warning() { echo -e "${YELLOW}[WARN] $1${NC}"; }
+log_error() { echo -e "${RED}[ERROR] $1${NC}"; }
+log_header() { echo -e "${PURPLE}[SILK] $1${NC}"; }
 
-# === AIDE GÉNÉRALE ===
-show_help() {
-    cat << EOF
-$(log_header "SILK v$SILK_VERSION - Smart Integrated Literary Kit")
-${CYAN}Structured Intelligence for Literary Kreation${NC}
-
-Modern CLI workflow for authors with LLM integration
-
-USAGE:
-  silk COMMAND [OPTIONS]
-
-CORE COMMANDS:
-  init        Créer un nouveau projet littéraire
-  context     Générer contexte optimisé pour LLM 
-  wordcount   Statistiques progression manuscrit
-  publish     Générer PDF professionnel multi-format
-  config      Configuration globale SILK
-  version     Afficher version
-
-OPTIONS GLOBALES:
-  -h, --help  Afficher aide (pour commande: silk COMMAND --help)
-  
-EXEMPLES SILK:
-  silk init "L'Araignée"                # Nouveau projet polar
-  silk context "Révision Emma" -ch 15   # Contexte LLM chapitre 15
-  silk wordcount 100000                 # Stats avec objectif 100k
-  silk publish -f iphone                # PDF format iPhone
-
-WORKFLOW SILK:
-  1. silk init "Mon Projet"             # 🕷️ Tisser la structure
-  2. [Écrire dans 01-Manuscrit/]        # ✍️  Rédaction avec ## manuscrit
-  3. silk wordcount                     # 📊 Suivre progression  
-  4. silk context "Question LLM"        # 🤖 Analyser avec IA
-  5. silk publish                       # 📖 Générer PDF final
-
-PHILOSOPHIE SILK:
-  Smart      Templates adaptés genre et marché
-  Integrated Workflow unifié conception→publication  
-  Literary   Focus sur fiction sophistiquée
-  Kit        Boîte à outils complète auteur
-
-SILK weaves together all elements of your novel
-like a spider weaves its web.
-
-Pour commencer: silk init --help
-Documentation: https://github.com/oinant/silk-cli
-EOF
+detect_os() {
+    case "$OSTYPE" in
+        msys*|cygwin*|mingw*) echo "windows" ;;
+        darwin*) echo "macos" ;;
+        linux*) echo "linux" ;;
+        *) echo "unknown" ;;
+    esac
 }
 
-# === DISPATCH COMMANDES ===
-dispatch_command() {
-    local command="$1"
-    shift
-    
-    case "$command" in
-        init)
-            load_module "commands/init.sh" || return 1
-            cmd_init "$@"
+is_silk_project() {
+    [[ -d "01-Manuscrit" && -d "02-Personnages" && -d "04-Concepts" ]]
+}
+
+find_silk_root() {
+    local current_dir="$PWD"
+    while [[ "$current_dir" != "/" ]]; do
+        if [[ -d "$current_dir/01-Manuscrit" ]]; then
+            echo "$current_dir"
+            return 0
+        fi
+        current_dir="$(dirname "$current_dir")"
+    done
+    return 1
+}
+
+ensure_silk_context() {
+    if ! is_silk_project; then
+        local silk_root
+        if silk_root=$(find_silk_root); then
+            log_info "Projet SILK trouve dans: $silk_root"
+            cd "$silk_root"
+        else
+            log_error "Pas dans un projet SILK. Utilisez 'silk init' pour creer un projet."
+            exit 1
+        fi
+    fi
+}
+
+# === GESTION CONFIGURATION ===
+load_config() {
+    mkdir -p "$SILK_HOME"
+    if [[ -f "$SILK_CONFIG" ]]; then
+        source "$SILK_CONFIG"
+    fi
+
+    # Valeurs par défaut
+    SILK_DEFAULT_GENRE="${SILK_DEFAULT_GENRE:-polar-psychologique}"
+    SILK_DEFAULT_LANGUAGE="${SILK_DEFAULT_LANGUAGE:-fr}"
+    SILK_DEFAULT_TARGET_WORDS="${SILK_DEFAULT_TARGET_WORDS:-80000}"
+    SILK_DEFAULT_CHAPTERS="${SILK_DEFAULT_CHAPTERS:-30}"
+    SILK_DEFAULT_FORMAT="${SILK_DEFAULT_FORMAT:-digital}"
+    SILK_AUTHOR_NAME="${SILK_AUTHOR_NAME:-}"
+    SILK_AUTHOR_PSEUDO="${SILK_AUTHOR_PSEUDO:-}"
+}
+
+save_config() {
+    cat > "$SILK_CONFIG" << 'CONFIG_EOF'
+# SILK Configuration - Smart Integrated Literary Kit
+SILK_DEFAULT_GENRE="${SILK_DEFAULT_GENRE:-polar-psychologique}"
+SILK_DEFAULT_LANGUAGE="${SILK_DEFAULT_LANGUAGE:-fr}"
+SILK_DEFAULT_TARGET_WORDS="${SILK_DEFAULT_TARGET_WORDS:-80000}"
+SILK_DEFAULT_CHAPTERS="${SILK_DEFAULT_CHAPTERS:-30}"
+SILK_DEFAULT_FORMAT="${SILK_DEFAULT_FORMAT:-digital}"
+SILK_AUTHOR_NAME="${SILK_AUTHOR_NAME:-}"
+SILK_AUTHOR_PSEUDO="${SILK_AUTHOR_PSEUDO:-}"
+CONFIG_EOF
+}
+
+# === COMMANDE VERSION ===
+cmd_version() {
+    echo "SILK v$SILK_VERSION"
+    echo "Smart Integrated Literary Kit"
+    echo "Structured Intelligence for Literary Kreation"
+    return 0
+}
+
+# === COMMANDE CONFIG ===
+cmd_config() {
+    load_config
+
+    case "${1:-list}" in
+        --list|list)
+            echo "SILK Configuration"
+            echo "=================="
+            echo "Genre par defaut        : ${SILK_DEFAULT_GENRE}"
+            echo "Langue par defaut       : ${SILK_DEFAULT_LANGUAGE}"
+            echo "Objectif mots defaut    : ${SILK_DEFAULT_TARGET_WORDS}"
+            echo "Chapitres par defaut    : ${SILK_DEFAULT_CHAPTERS}"
+            echo "Format par defaut       : ${SILK_DEFAULT_FORMAT}"
+            echo "Nom auteur              : ${SILK_AUTHOR_NAME:-non defini}"
+            echo "Pseudonyme auteur       : ${SILK_AUTHOR_PSEUDO:-non defini}"
+            echo ""
+            echo "Fichier config          : $SILK_CONFIG"
             ;;
-        context)
-            load_module "commands/context.sh" || return 1
-            cmd_context "$@"
+        --set)
+            if [[ $# -lt 2 ]] || [[ "$2" != *"="* ]]; then
+                log_error "Format: silk config --set KEY=VALUE"
+                return 1
+            fi
+            local key="${2%%=*}"
+            local value="${2#*=}"
+
+            case "$key" in
+                SILK_AUTHOR_NAME) SILK_AUTHOR_NAME="$value" ;;
+                SILK_DEFAULT_GENRE) SILK_DEFAULT_GENRE="$value" ;;
+                SILK_DEFAULT_TARGET_WORDS) SILK_DEFAULT_TARGET_WORDS="$value" ;;
+                *) log_error "Cle inconnue: $key"; return 1 ;;
+            esac
+
+            save_config
+            log_success "Configuration mise a jour: $key=$value"
             ;;
-        wordcount|wc)
-            load_module "commands/wordcount.sh" || return 1
-            cmd_wordcount "$@"
+        --get)
+            if [[ $# -lt 2 ]]; then
+                log_error "Format: silk config --get KEY"
+                return 1
+            fi
+            case "$2" in
+                SILK_AUTHOR_NAME) echo "$SILK_AUTHOR_NAME" ;;
+                SILK_DEFAULT_GENRE) echo "$SILK_DEFAULT_GENRE" ;;
+                SILK_DEFAULT_TARGET_WORDS) echo "$SILK_DEFAULT_TARGET_WORDS" ;;
+                *) log_error "Cle inconnue: $2"; return 1 ;;
+            esac
             ;;
-        publish|pdf)
-            load_module "commands/publish.sh" || return 1
-            cmd_publish "$@"
-            ;;
-        config)
-            load_module "commands/config.sh" || return 1
-            cmd_config "$@"
-            ;;
-        debug)
-            load_module "commands/debug.sh" || return 1
-            cmd_debug "$@"
-            ;;
-        version)
-            echo "🕷️ SILK v$SILK_VERSION - Smart Integrated Literary Kit"
-            echo "Structured Intelligence for Literary Kreation"
-            echo "https://github.com/oinant/silk-cli"
-            echo "📁 Modules: $SILK_LIB_DIR"
-            ;;
-        -h|--help|help|"")
-            show_help
+        --help|-h)
+            show_config_help
             ;;
         *)
-            log_error "Commande SILK inconnue: $command"
-            echo "💡 Utilisez 'silk --help' pour voir les commandes disponibles"
-            echo "🕸️ SILK weaves intelligence into literary creation"
+            log_error "Option inconnue: $1"
+            show_config_help
             return 1
             ;;
     esac
 }
 
-# === VALIDATION ENVIRONNEMENT ===
-validate_environment() {
-    # Vérifier version Bash
-    if [[ "${BASH_VERSION%%.*}" -lt 4 ]]; then
-        log_warning "Bash 4.0+ recommandé (actuel: $BASH_VERSION)"
-    fi
-    
-    # Vérifier répertoire modules
-    if [[ ! -d "$SILK_LIB_DIR" ]]; then
-        log_error "Répertoire modules SILK non trouvé: $SILK_LIB_DIR"
-        echo "💡 Solutions:"
-        echo "   - Installation complète: curl -sSL install-url | bash"
-        echo "   - Variable SILK_LIB_DIR pointant vers lib/"
-        return 1
-    fi
-    
-    # Initialisation première utilisation
-    if [[ ! -f "$SILK_CONFIG" ]]; then
-        log_info "Première utilisation SILK - initialisation..."
-        mkdir -p "$SILK_HOME"
-        if silk_config_init; then
-            log_success "Configuration SILK initialisée"
-        else
-            log_warning "Impossible d'initialiser la configuration"
-        fi
-    fi
-    
-    return 0
+show_config_help() {
+    cat << 'HELP_EOF'
+SILK CONFIG - Configuration globale
+
+USAGE:
+  silk config [OPTIONS]
+
+OPTIONS:
+  --list                    Afficher toute la configuration (defaut)
+  --set KEY=VALUE          Definir une configuration
+  --get KEY                Afficher une configuration
+  -h, --help               Afficher cette aide
+
+EXEMPLES:
+  silk config --list
+  silk config --set SILK_AUTHOR_NAME="Jean Dupont"
+  silk config --get SILK_DEFAULT_GENRE
+
+CLES DISPONIBLES:
+  SILK_AUTHOR_NAME         Nom de l'auteur
+  SILK_DEFAULT_GENRE       Genre par defaut (polar-psychologique, fantasy, etc.)
+  SILK_DEFAULT_TARGET_WORDS Objectif mots par defaut
+HELP_EOF
+}
+
+# === AIDE GÉNÉRALE ===
+show_help() {
+    log_header "SILK - Smart Integrated Literary Kit v$SILK_VERSION"
+    echo
+    echo "CLI unifie pour l'ecriture de romans avec integration LLM"
+    echo
+    echo "USAGE:"
+    echo "  silk COMMAND [OPTIONS]"
+    echo
+    echo "COMMANDES:"
+    echo "  init        Creer un nouveau projet d'ecriture"
+    echo "  context     Generer contexte pour LLM (Claude, GPT, etc.)"
+    echo "  wordcount   Statistiques progression manuscrit"
+    echo "  publish     Generer PDF du manuscrit"
+    echo "  config      Configuration globale SILK"
+    echo "  version     Afficher version"
+    echo
+    echo "OPTIONS GLOBALES:"
+    echo "  -h, --help  Afficher aide"
+    echo
+    echo "EXEMPLES:"
+    echo "  silk init \"Mon Roman\"              # Nouveau projet"
+    echo "  silk context \"Revision ch15\"       # Contexte LLM"
+    echo "  silk wordcount 100000              # Stats avec objectif 100k"
+    echo "  silk publish -f iphone             # PDF format iPhone"
+    echo
+    echo "SILK weaves your story together."
 }
 
 # === POINT D'ENTRÉE PRINCIPAL ===
 main() {
-    # Validation environnement
-    validate_environment || exit 1
-    
-    # Chargement configuration
-    silk_config_load || {
-        log_warning "Impossible de charger la configuration"
-    }
-    
-    # Dispatch commande
-    if [[ $# -eq 0 ]]; then
-        show_help
-    else
-        dispatch_command "$@"
-    fi
+    # Charger configuration au démarrage
+    load_config
+
+    # Parse commande principale
+    case "${1:-}" in
+        version)
+            cmd_version
+            ;;
+        config)
+            shift
+            cmd_config "$@"
+            ;;
+        init|context|wordcount|publish)
+            log_warning "Commande '$1' pas encore implementee dans cette version de debug"
+            log_info "Commandes disponibles: version, config, --help"
+            exit 1
+            ;;
+        -h|--help|help|"")
+            show_help
+            ;;
+        *)
+            log_error "Commande inconnue: $1"
+            echo "Utilisez 'silk --help' pour voir les commandes disponibles"
+            exit 1
+            ;;
+    esac
 }
 
-# === GESTION SIGNAUX ===
-trap 'echo "🕷️ SILK interrupted - web partially woven"; exit 130' INT
-trap 'echo "🕸️ SILK terminated gracefully"; exit 143' TERM
-
-# === EXÉCUTION ===
+# Exécution si script appelé directement
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi
-
-# === SILK SIGNATURE ===
-# 🕷️ SILK v1.0.0 - Smart Integrated Literary Kit
-# Structured Intelligence for Literary Kreation  
-# Built with ❤️ by authors, for authors
-# SILK weaves your story together
