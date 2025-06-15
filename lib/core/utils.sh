@@ -116,31 +116,61 @@ extract_chapter_number() {
     local filename="$(basename "$1")"
     local chapter_num=""
 
-    # Pattern 1: Ch23-1 -> 23, Ch05 -> 5
-    chapter_num=$(echo "$filename" | sed -n 's/^[Cc]h\([0-9]\+\).*/\1/p' | sed 's/^0*//')
+    log_debug "🔍 extract_chapter_number: fichier='$filename'"
 
-    # Pattern 2: Chapitre23 -> 23
+    # Pattern 1: Ch01-titre -> 1, Ch23-1-titre -> 23
+    if [[ "$filename" =~ ^[Cc]h([0-9]+) ]]; then
+        chapter_num="${BASH_REMATCH[1]}"
+        log_debug "✅ Pattern Ch: trouvé '$chapter_num'"
+        # Supprimer les zéros de début (01 -> 1)
+        chapter_num=$(echo "$chapter_num" | sed 's/^0*//')
+        log_debug "✅ Après suppression zéros: '$chapter_num'"
+    else
+        log_debug "❌ Pattern Ch: pas de match"
+    fi
+
+    # Pattern 2: Chapitre23 -> 23 (fallback)
     if [[ -z "$chapter_num" ]]; then
         chapter_num=$(echo "$filename" | sed -n 's/^[Cc]hapitre\([0-9]\+\).*/\1/p' | sed 's/^0*//')
+        if [[ -n "$chapter_num" ]]; then
+            log_debug "✅ Pattern Chapitre: trouvé '$chapter_num'"
+        else
+            log_debug "❌ Pattern Chapitre: pas de match"
+        fi
     fi
 
-    # Pattern 3: 23-titre -> 23
+    # Pattern 3: 23-titre -> 23 (fallback)
     if [[ -z "$chapter_num" ]]; then
         chapter_num=$(echo "$filename" | sed -n 's/^\([0-9]\+\).*/\1/p' | sed 's/^0*//')
+        if [[ -n "$chapter_num" ]]; then
+            log_debug "✅ Pattern numérique: trouvé '$chapter_num'"
+        else
+            log_debug "❌ Pattern numérique: pas de match"
+        fi
     fi
 
-    echo "${chapter_num:-0}"
+    local result="${chapter_num:-0}"
+    log_debug "🎯 RESULTAT FINAL: '$result'"
+    echo "$result"
 }
 
 extract_manuscript_content() {
     local file="$1"
     local marker="${2:-## manuscrit}"
 
+    log_debug "🔍 extract_manuscript_content: fichier='$file', marker='$marker'"
+
     if grep -q "$marker" "$file"; then
+        log_debug "✅ Marqueur '$marker' trouvé dans $file"
         sed -n "/$marker/,\$p" "$file" | tail -n +2
+        log_debug "✅ Contenu extrait avec succès"
+        return 0
     else
-        log_warning "Fichier sans séparateur: $(basename "$file")"
-        return 1
+        log_debug "❌ Marqueur '$marker' non trouvé dans $file"
+        # NE PAS faire exit ou return 1 - ça casse la boucle !
+        # Juste retourner du contenu vide ou un message
+        echo "[Pas de contenu manuscrit trouvé - marqueur '$marker' manquant]"
+        return 0  # Important: return 0 pour continuer la boucle
     fi
 }
 
@@ -181,25 +211,33 @@ is_chapter_in_range() {
     local chapter_num="$1"
     local range="$2"
 
+    log_debug "🎯 is_chapter_in_range: ch='$chapter_num', range='$range'"
+
     # Si "all", inclure tout
     if [[ "$range" == "all" ]]; then
+        log_debug "✅ Range 'all' - inclus"
         return 0
     fi
 
     # Vérifier si le chapitre_num est vide ou non numérique
     if [[ -z "$chapter_num" ]] || ! [[ "$chapter_num" =~ ^[0-9]+$ ]]; then
-        return 0  # Inclus par défaut
+        log_debug "❌ Chapitre invalide: '$chapter_num'"
+        return 1
     fi
 
     # Support pour liste de chapitres séparés par ,
     if [[ "$range" == *","* ]]; then
+        log_debug "🔍 Range avec virgules: $range"
         IFS=',' read -ra chapter_list <<< "$range"
         for ch in "${chapter_list[@]}"; do
             ch=$(echo "$ch" | tr -d ' ')
+            log_debug "  Comparaison: $chapter_num == $ch"
             if [[ "$chapter_num" -eq "$ch" ]]; then
+                log_debug "✅ Match trouvé dans liste"
                 return 0
             fi
         done
+        log_debug "❌ Pas de match dans liste"
         return 1
     fi
 
@@ -207,17 +245,25 @@ is_chapter_in_range() {
     if [[ "$range" == *"-"* ]]; then
         local start_ch=$(echo "$range" | cut -d'-' -f1)
         local end_ch=$(echo "$range" | cut -d'-' -f2)
+        log_debug "🔍 Range numérique: $start_ch-$end_ch"
+        log_debug "  Test: $chapter_num >= $start_ch && $chapter_num <= $end_ch"
 
         if [[ "$chapter_num" -ge "$start_ch" ]] && [[ "$chapter_num" -le "$end_ch" ]]; then
+            log_debug "✅ Dans range numérique"
             return 0
         else
+            log_debug "❌ Hors range numérique"
             return 1
         fi
     else
         # Range d'un seul chapitre (ex: "28")
+        log_debug "🔍 Range simple: $range"
+        log_debug "  Test: $chapter_num == $range"
         if [[ "$chapter_num" -eq "$range" ]]; then
+            log_debug "✅ Match exact"
             return 0
         else
+            log_debug "❌ Pas de match exact"
             return 1
         fi
     fi

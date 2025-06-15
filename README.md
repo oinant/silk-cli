@@ -166,17 +166,241 @@ fi
 - [ ] **v2.0** : .NET Core version + GUI + cloud integration
 - [ ] **v2.1** : Integrated AI + personalized writing coaching
 
+## 🧪 Testing & Debugging
+
+### Running Tests
+
+SILK includes comprehensive test suites to ensure reliability across platforms:
+
+```bash
+# Basic functionality tests
+./tests/test-modular-compatibility.sh
+
+# Full test suite with project creation
+./tests/silk_master_test_suite.sh
+
+# Platform compatibility (Windows/Linux/macOS)
+./tests/test-compatibility.sh
+
+# Architecture validation
+./validate-silk-architecture.sh
+```
+
+### Debug Mode
+
+Enable detailed logging to troubleshoot issues:
+
+```bash
+# Enable debug mode for any command
+SILK_DEBUG=true silk context "Your prompt" --chapters 1-5
+
+# Debug specific modules
+SILK_DEBUG=true silk init "Debug Project" --yes
+
+# Debug extraction issues
+SILK_DEBUG=true silk wordcount --summary
+```
+
+**Debug output shows:**
+- Module loading sequence
+- File detection and processing
+- Chapter extraction logic
+- Range validation
+- Context generation steps
+
+### Common Issues
+
+**Chapter detection fails:**
+```bash
+# Check file patterns and extraction
+SILK_DEBUG=true silk context "Test" --chapters 1-3
+# Look for "extract_chapter_number" debug lines
+```
+
+**Context generation stops early:**
+```bash
+# Verify bash strict mode compatibility
+set +e  # Temporarily disable in problematic functions
+```
+
+**Module loading errors:**
+```bash
+# Check module dependencies
+SILK_DEBUG=true silk --version
+```
+
 ## 🤝 Contributing
 
-Based on real author workflow with 30+ chapters, 450 pages, optimized LLM pipeline.
+SILK was born from a real author's workflow with 30+ chapters, 450 pages, and optimized LLM integration. We welcome contributions that enhance the modern writing experience!
 
-SILK was born from the concrete need to optimize modern writing with AI.
+### Development Setup
 
-1. Fork the project
-2. Create feature branch (`git checkout -b feature/silk-amazing`)
-3. Commit (`git commit -m 'Add SILK amazing feature'`)
-4. Push (`git push origin feature/silk-amazing`)
-5. Create Pull Request
+1. **Fork and clone:**
+   ```bash
+   git clone https://github.com/your-username/silk-cli
+   cd silk-cli
+   chmod +x silk
+   ```
+
+2. **Test your environment:**
+   ```bash
+   ./tests/test-modular-compatibility.sh
+   SILK_DEBUG=true ./silk version
+   ```
+
+3. **Create a test project:**
+   ```bash
+   ./silk init "Development Test" --genre polar-psychologique --yes
+   cd development-test
+   ../silk context "Test development setup"
+   ```
+
+### Architecture Guidelines
+
+**Core Modules (`lib/core/`):**
+- `utils.sh` - Utility functions (logging, validation, file operations)
+- `config.sh` - Configuration management
+- `vault.sh` - Project detection and navigation
+
+**Command Modules (`lib/commands/`):**
+- Follow naming: `cmd_<name>()` for main function
+- Include `show_<name>_help()` for detailed help
+- Add dependency checks for required core modules
+- Export functions and set `readonly SILK_COMMAND_<NAME>_LOADED=true`
+
+**Template Modules (`lib/templates/`):**
+- Genre-specific project generators
+- Market-adapted content (FR, US, UK, DE)
+- LLM-optimized prompts and structures
+
+### Code Standards
+
+```bash
+#!/bin/bash
+# lib/commands/example.sh - Brief description
+
+# Dependency verification
+if [[ "${SILK_CORE_UTILS_LOADED:-false}" != "true" ]]; then
+    echo "❌ Module core/utils required" >&2
+    exit 1
+fi
+
+cmd_example() {
+    # Implementation with proper error handling
+    # Use set +e around problematic loops if needed
+}
+
+show_example_help() {
+    cat << 'HELP'
+🕷️ SILK EXAMPLE - Brief description
+# Detailed help content
+HELP
+}
+
+# Export functions
+export -f cmd_example show_example_help
+readonly SILK_COMMAND_EXAMPLE_LOADED=true
+```
+
+### Testing Your Changes
+
+1. **Syntax validation:**
+   ```bash
+   bash -n lib/commands/your-module.sh
+   ./check-syntax.sh  # Validates all modules
+   ```
+
+2. **Functionality testing:**
+   ```bash
+   # Test your specific command
+   SILK_DEBUG=true ./silk your-command --help
+   SILK_DEBUG=true ./silk your-command test-args
+
+   # Full integration test
+   ./tests/silk_master_test_suite.sh
+   ```
+
+3. **Platform compatibility:**
+   ```bash
+   # Test on different environments
+   ./tests/test-compatibility.sh
+   ```
+
+### Contribution Areas
+
+**High Priority:**
+- **Genre Templates:** Expand beyond polar/fantasy/romance
+- **LLM Integration:** New prompt strategies and context optimizations
+- **Publication Formats:** Additional PDF layouts and export options
+- **Analytics:** Advanced progression tracking and writing metrics
+
+**Multilingual Support:**
+- Template localization (ES, DE, IT)
+- Market-specific publishing formats
+- Cultural adaptation of narrative structures
+
+**Platform Extensions:**
+- VS Code extension for SILK projects
+- Integration with writing tools (Scrivener, Notion)
+- Cloud sync and collaboration features
+
+### Pull Request Process
+
+1. **Create feature branch:**
+   ```bash
+   git checkout -b feature/silk-amazing-feature
+   ```
+
+2. **Develop with tests:**
+   ```bash
+   # Make changes
+   # Add tests
+   ./tests/test-modular-compatibility.sh
+   ```
+
+3. **Document your changes:**
+   - Update relevant help text
+   - Add examples to documentation
+   - Include any breaking changes in commit message
+
+4. **Submit PR:**
+   ```bash
+   git commit -m 'Add SILK amazing feature
+
+   - Implements new context generation strategy
+   - Adds support for screenplay format
+   - Includes tests and documentation
+
+   BREAKING CHANGE: Updates context.sh API'
+   git push origin feature/silk-amazing-feature
+   ```
+
+### Development Philosophy
+
+**Author-Centric Design:**
+- Every feature should solve a real writing problem
+- Optimize for daily workflow efficiency
+- Maintain compatibility with existing projects
+
+**LLM-First Approach:**
+- Context generation is the core feature
+- Templates should produce optimal prompts
+- Support multiple LLM providers and styles
+
+**Cross-Platform Reliability:**
+- Test on Windows (Git Bash), Linux, and macOS
+- Handle path differences and shell variations
+- Maintain POSIX compatibility where possible
+
+### Community
+
+- **Issues:** Report bugs, request features, ask questions
+- **Discussions:** Share writing workflows, LLM strategies
+- **Wiki:** Contribute templates, examples, best practices
+
+**Recognition:** Contributors are credited in releases and documentation. Major contributions may be highlighted in the project showcase.
+
+SILK weaves together the contributions of the writing community! 🕸️
 
 ## 📊 Project Stats
 
