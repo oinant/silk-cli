@@ -77,7 +77,9 @@ silk publish -f iphone                # Generate PDF
 - ✅ **Smart Templates** : Project generators by genre (crime, fantasy, romance)
 - ✅ **Integrated Workflow** : From idea to PDF in 4 commands
 - ✅ **Literary Focus** : Templates adapted by market (FR, US, UK, DE)
-- ✅ **Kit Complete** : LLM context + statistics + publishing
+- ✅ **LLM Context** : Unified context generation with flexible chapter ranges
+- ✅ **Progress Analytics** : Advanced wordcount with chapter grouping and projections
+- ✅ **Multi-Format Publishing** : Professional PDF generation
 - ✅ **Multi-Platform** : Compatible Windows/Linux/macOS
 
 ## 📚 Typical Workflow
@@ -99,6 +101,34 @@ silk publish -f iphone                # Generate PDF
 
 ## manuscrit
 [Pure content analyzed by LLM]
+```
+
+### Intelligent context generation
+```bash
+# Generate unified context for LLM
+silk context "Analyze character development" --chapters 1-5
+silk context "Check narrative coherence" --chapters 15,18,20-25
+silk context "Review dialogue quality" --full --wordcount
+
+# Predefined prompts
+silk context -p coherence --chapters 10-15
+silk context -p revision --full
+```
+
+### Advanced progress tracking
+```bash
+# Comprehensive wordcount analysis
+silk wordcount                    # Default target from config
+silk wordcount 100000            # Custom target
+silk wordcount --summary         # Quick overview
+silk wordcount --json           # Export data
+
+# Features:
+# - Automatic chapter grouping (Ch23 + Ch23-1 = Ch23)
+# - Editorial threshold positioning (40k-120k words)
+# - Regularity analysis with recommendations
+# - Priority chapters identification
+# - Export formats (JSON, CSV)
 ```
 
 ### Intelligent context
