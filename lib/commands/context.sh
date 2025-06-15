@@ -645,6 +645,8 @@ extract_chapters_content() {
 
     log_debug "Extraction chapitres pour range: $chapter_range"
 
+    set +e
+
     for file in 01-Manuscrit/*.md; do
         if [[ -f "$file" ]] && [[ $(wc -l < "$file") -gt 15 ]]; then
             local chapter_num=$(extract_chapter_number "$file")
@@ -658,11 +660,14 @@ extract_chapters_content() {
                 ((chapters_included++))
             else
                 ((chapters_excluded++))
+                log_debug "❌ EXCLU: $(basename "$file") (Ch$chapter_num)"
             fi
         fi
     done
 
     log_debug "Chapitres: $chapters_included inclus, $chapters_excluded exclus"
+
+    set -e
 
     # Stocker stats pour le rapport
     export SILK_CONTEXT_INCLUDED="$chapters_included"

@@ -1,4 +1,4 @@
-# silk CLI - Gitignore
+# SILK CLI - Gitignore
 
 # OS
 .DS_Store
@@ -12,24 +12,30 @@ Thumbs.db
 *.swp
 *.swo
 
-# Tests temporaires
-test-output/
-temp-*
-silk-test-suite/        # Dossier test temporaire
-*-test-project/         # Projets de test générés
-test-*/                 # Tous dossiers test-*
+# SILK temporaires
+outputs/temp/
+.silk-cache/
 
-# Scripts de debug temporaires
+# SILK backups et tests
+silk-backup-*/
+silk-test-suite/
+*-test-project/
+test-*/
+
+# Scripts debug temporaires (devtools/ est tracké)
 debug-*.sh
-fix-*.sh
-normalize-scripts.sh
+!devtools/debug-*.sh
 
-# Backups temporaires
-*.backup
+# Sauvegardes
 *.backup.*
 silk.broken.*
 
-# Distribution  
+# Log files
+*.log
+logs/
+silk-integration.log
+
+# Distribution
 dist/
 build/
 *.tar.gz
@@ -39,10 +45,3 @@ build/
 .env
 .env.local
 config.local
-
-# Log files
-*.log
-logs/
-
-# Cache SILK
-.silk-cache/
