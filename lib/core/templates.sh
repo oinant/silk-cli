@@ -7,6 +7,39 @@ if [[ "${SILK_CORE_UTILS_LOADED:-false}" != "true" ]]; then
     exit 1
 fi
 
+# === INITIALISATION SILK_LIB_DIR ===
+init_silk_lib_dir() {
+    # Si SILK_LIB_DIR est déjà définie et valide, on garde
+    if [[ -n "${SILK_LIB_DIR:-}" && -d "$SILK_LIB_DIR" ]]; then
+        log_debug "SILK_LIB_DIR déjà définie: $SILK_LIB_DIR"
+        return 0
+    fi
+
+    # Auto-détection du répertoire lib/
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local lib_candidates=(
+        "$script_dir/.."          # Si on est dans lib/core/
+        "$script_dir"             # Si on est dans lib/
+        "$PWD/lib"                # Depuis la racine du projet
+        "$script_dir/../../lib"   # Si on est dans lib/core/templates/
+    )
+
+    for candidate in "${lib_candidates[@]}"; do
+        if [[ -d "$candidate" && -d "$candidate/templates" ]]; then
+            export SILK_LIB_DIR="$candidate"
+            log_debug "SILK_LIB_DIR auto-détectée: $SILK_LIB_DIR"
+            return 0
+        fi
+    done
+
+    # Fallback final
+    export SILK_LIB_DIR="lib"
+    log_debug "SILK_LIB_DIR fallback: $SILK_LIB_DIR"
+}
+
+# Initialiser dès le chargement du module
+init_silk_lib_dir
+
 # === FONCTION PRINCIPALE SUBSTITUTION ===
 substitute_template() {
     local template_file="$1"
@@ -89,25 +122,64 @@ find_template() {
     local template_name="$1"
     local genre="${2:-}"
 
+    # Déterminer le répertoire de base SILK
+    local silk_base_dir="${SILK_LIB_DIR:-}"
+
+    # Si SILK_LIB_DIR est vide, utiliser détection automatique
+    if [[ -z "$silk_base_dir" ]]; then
+        # Chercher lib/ depuis le script courant ou PWD
+        if [[ -d "lib" ]]; then
+            silk_base_dir="lib"
+        elif [[ -d "../lib" ]]; then
+            silk_base_dir="../lib"
+        elif [[ -d "$PWD/lib" ]]; then
+            silk_base_dir="$PWD/lib"
+        else
+            # Fallback: chercher depuis le répertoire du script principal
+            local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            if [[ -d "$script_dir/../lib" ]]; then
+                silk_base_dir="$script_dir/../lib"
+            elif [[ -d "$script_dir/lib" ]]; then
+                silk_base_dir="$script_dir/lib"
+            else
+                silk_base_dir="lib"  # Fallback final
+            fi
+        fi
+    fi
+
+    log_debug "Recherche template avec base_dir: $silk_base_dir"
+
     # Recherche hiérarchique: genre-spécifique → common → formats
+    # Support pour .template, .yaml, .md et sans extension
     local search_paths=(
+        "${silk_base_dir}/templates/${genre}/${template_name}.template"
+        "${silk_base_dir}/templates/common/${template_name}.template"
+        "${silk_base_dir}/templates/formats/${template_name}.template"
+        "${silk_base_dir}/templates/formats/${template_name}.yaml"
+        "${silk_base_dir}/templates/formats/${template_name}.md"
+        "formats/${template_name}.template"
+        "formats/${template_name}.yaml"
+        "formats/${template_name}.md"
+        "${silk_base_dir}/templates/${genre}/${template_name}"
+        "${silk_base_dir}/templates/common/${template_name}"
+        "formats/${template_name}"
+        # Fallbacks absolus pour compatibilité
         "lib/templates/${genre}/${template_name}.template"
         "lib/templates/common/${template_name}.template"
-        "lib/templates/formats/${template_name}.template"
-        "formats/${template_name}.template"
-        "lib/templates/${genre}/${template_name}"
-        "lib/templates/common/${template_name}"
-        "formats/${template_name}"
+        "lib/templates/formats/${template_name}.yaml"
     )
 
+    log_debug "Chemins de recherche pour '$template_name' (genre: ${genre:-aucun}):"
     for path in "${search_paths[@]}"; do
+        log_debug "  - $path"
         if [[ -f "$path" ]]; then
+            log_debug "  ✅ Trouvé: $path"
             echo "$path"
             return 0
         fi
     done
 
-    log_debug "Template non trouvé: $template_name (genre: ${genre:-aucun})"
+    log_debug "❌ Template non trouvé: $template_name (genre: ${genre:-aucun})"
     return 1
 }
 
@@ -134,7 +206,7 @@ validate_template() {
 
 # === LISTAGE TEMPLATES DISPONIBLES ===
 list_available_templates() {
-    local search_dir="${1:-lib/templates}"
+    local search_dir="${1:-${SILK_LIB_DIR:-lib}/templates}"
 
     if [[ ! -d "$search_dir" ]]; then
         log_warning "Répertoire templates inexistant: $search_dir"
@@ -206,7 +278,7 @@ substitute_yaml_template() {
     shift 2
 
     local template_file
-    template_file=$(find_template "${template_name}.yaml" "formats")
+    template_file=$(find_template "$template_name" "formats")
 
     if [[ $? -eq 0 ]]; then
         substitute_template "$template_file" "$output_file" "$@"
@@ -224,7 +296,7 @@ substitute_markdown_template() {
     shift 3
 
     local template_file
-    template_file=$(find_template "${template_name}.md" "$genre")
+    template_file=$(find_template "$template_name" "$genre")
 
     if [[ $? -eq 0 ]]; then
         substitute_template "$template_file" "$output_file" "$@"
@@ -265,9 +337,9 @@ export -f find_template validate_template
 export -f list_available_templates extract_template_variables
 export -f substitute_template_batch
 export -f substitute_yaml_template substitute_markdown_template
-export -f templates_self_test
+export -f templates_self_test init_silk_lib_dir
 
 # Marquer module comme chargé
 readonly SILK_CORE_TEMPLATES_LOADED=true
 
-log_debug "Module templates.sh chargé"
+log_debug "Module templates.sh chargé avec SILK_LIB_DIR=${SILK_LIB_DIR:-non définie}"
