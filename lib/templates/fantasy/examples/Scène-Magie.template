@@ -1,0 +1,34 @@
+# Exemple : Scène de Magie Fantasy
+
+## Contexte magique
+**Praticien** : {{MAGE_NAME}}
+**Magie utilisée** : {{SPELL_TYPE}}
+**Environnement** : {{MAGICAL_ENVIRONMENT}}
+**Coût/Risque** : {{COST_DESCRIPTION}}
+
+## Objectifs scène
+- **Démonstration** : {{MAGIC_RULES_SHOWN}}
+- **Caractérisation** : {{CHARACTER_THROUGH_MAGIC}}
+- **Progression** : {{PLOT_ADVANCEMENT}}
+
+## Structure type
+```markdown
+## manuscrit
+
+{{MAGE_NAME}} sentit {{MAGICAL_SENSATION}} affluer en lui.
+La magie {{MAGIC_DESCRIPTION}}, exigeant {{COST_DESCRIPTION}}.
+
+{{INCANTATION_OR_GESTURE}}
+
+L'air {{ENVIRONMENTAL_CHANGE}}. {{MAGICAL_EFFECT_DESCRIPTION}}.
+
+Mais {{LIMITATION_OR_CONSEQUENCE}}.
+
+[Montrer les règles à travers l'action...]
+```
+
+## Notes worldbuilding
+- **Cohérence** : Respect des règles établies
+- **Coût** : Toujours un prix à payer
+- **Visuel** : Description immersive mais pas excessive
+- **Émotion** : Impact sur le personnage et l'intrigue

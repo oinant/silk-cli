@@ -1,0 +1,47 @@
+# Structure d'Enquête - {{PROJECT_NAME}}
+
+## 🔍 Crime Central
+- **Nature** : [Type de crime principal]
+- **Localisation** : [Lieu du crime]
+- **Timing** : [Moment et circonstances]
+- **Méthode** : [Comment le crime a été commis]
+
+## 🕵️ Enquêteur Principal
+- **Nom** : [Nom de l'enquêteur]
+- **Fonction** : [Police, privé, amateur...]
+- **Spécialité** : [Méthodes d'investigation privilégiées]
+- **Motivation personnelle** : [Pourquoi cette affaire le touche]
+
+## 🧩 Progression Investigative
+
+### Acte I - Découverte (Ch. 1-{{FIRST_ACT_CHAPTERS}})
+- [ ] Scène de crime découverte
+- [ ] Premiers indices collectés
+- [ ] Suspects potentiels identifiés
+- [ ] Contexte et enjeux établis
+
+### Acte II - Investigation (Ch. {{SECOND_ACT_START}}-{{SECOND_ACT_END}})
+- [ ] Approfondissement des suspects
+- [ ] Fausses pistes explorées
+- [ ] Révélations partielles
+- [ ] Complications et obstacles
+
+### Acte III - Résolution (Ch. {{THIRD_ACT_START}}-{{TARGET_CHAPTERS}})
+- [ ] Indices cruciaux découverts
+- [ ] Confrontation avec le coupable
+- [ ] Révélation des motivations
+- [ ] Dénouement et conséquences
+
+## 🎯 Indices et Révélations
+| Chapitre | Indice découvert | Impact sur l'enquête |
+|----------|------------------|---------------------|
+| Ch.1     | [Premier indice] | [Oriente vers...]   |
+| Ch.X     | [À définir]      | [À définir]         |
+
+## 🔄 Fausses Pistes
+1. **Piste A** : [Description] → Éliminée au chapitre X
+2. **Piste B** : [Description] → Éliminée au chapitre Y
+3. **Piste C** : [Description] → Révélée vraie au chapitre Z
+
+---
+*Structure d'enquête pour {{PROJECT_NAME}} - Genre {{GENRE}}*

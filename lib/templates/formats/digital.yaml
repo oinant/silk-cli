@@ -1,0 +1,8 @@
+geometry: "paperwidth=6in,paperheight=9in,margin=0.5in"
+fontsize: 12pt
+linestretch: 1.3
+header-includes: |
+  \setlength{\parskip}{0.5em}
+  \setlength{\parindent}{1.2em}
+  \usepackage{microtype}
+

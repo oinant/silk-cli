@@ -1,0 +1,42 @@
+# Instructions LLM - {{PROJECT_NAME}}
+
+## 🎯 CONTEXTE PROJET
+**Genre** : Polar psychologique  
+**Auteur** : {{AUTHOR_NAME}}{{PROJECT_SUBTITLE}}  
+**Objectif** : {{TARGET_WORDS}} mots ({{TARGET_CHAPTERS}} chapitres)
+
+## 🔍 MÉCANIQUES CENTRALES POLAR
+### Structure enquête
+- **Crime initial** : Événement déclencheur soigneusement construit
+- **Investigation** : Progression logique avec fausses pistes
+- **Révélations graduelles** : Montée en tension par paliers
+- **Résolution** : Dénouement satisfaisant et cohérent
+
+### Psychologie des personnages
+- **Enquêteur** : Motivations profondes, méthodes distinctives
+- **Suspects** : Profils psychologiques complexes et crédibles
+- **Victime** : Rôle narratif au-delà du simple déclencheur
+
+## 📋 INSTRUCTIONS SPÉCIFIQUES
+### Cohérence investigative
+- Indices plantés de manière naturelle dans la narration
+- Logique déductive respectée et vérifiable
+- Fausses pistes justifiées et non arbitraires
+
+### Tension psychologique
+- Exploration des motivations humaines profondes
+- Atmosphère oppressante mais pas gratuite
+- Dialogue révélateur des personnalités
+
+### Style {{GENRE}}
+- Rythme alterné : tension/réflexion
+- Descriptions ciblées renforçant l'atmosphère
+- Point de vue cohérent avec l'enquête
+
+## 🎭 SPÉCIFICITÉS MARCHÉ FRANÇAIS
+- Codes du polar français contemporain
+- Références culturelles françaises naturelles
+- Public cible : lecteurs amateur de polar psychologique sophistiqué
+
+---
+*Instructions générées pour {{PROJECT_NAME}} - {{DATE}}*

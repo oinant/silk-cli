@@ -1,0 +1,33 @@
+# Exemple : Scène d'Interrogatoire Polar
+
+## Contexte
+**Personnages** : {{DETECTIVE_NAME}} / {{SUSPECT_NAME}}
+**Lieu** : {{LOCATION}}
+**Enjeu** : {{STAKES}}
+
+## Objectifs scène
+- **Information** : {{INFO_TO_REVEAL}}
+- **Tension** : {{TENSION_TYPE}}
+- **Caractérisation** : {{CHARACTER_REVEAL}}
+
+## Structure type
+```markdown
+## manuscrit
+
+{{DETECTIVE_NAME}} observa {{SUSPECT_NAME}} quelques secondes avant de commencer.
+L'art de l'interrogatoire résidait autant dans les silences que dans les questions.
+
+"{{OPENING_QUESTION}}"
+
+{{SUSPECT_NAME}} {{REACTION_DESCRIPTION}}.
+
+"{{SUSPECT_RESPONSE}}"
+
+[Développer l'échange en révélant progressivement...]
+```
+
+## Notes techniques
+- **Psychologie** : Jouer sur les failles du suspect
+- **Rythme** : Alterner pression et détente
+- **Révélation** : Distiller l'information cruciale
+- **Authenticité** : Crédibilité procédure et dialogue

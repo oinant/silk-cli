@@ -1,0 +1,35 @@
+# SILK CLI - Gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# SILK temporaires
+outputs/temp/
+.silk-cache/
+
+# Sauvegardes
+*.backup.*
+
+# Log files
+*.log
+logs/
+
+# Distribution
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Local config
+.env
+.env.local
+config.local

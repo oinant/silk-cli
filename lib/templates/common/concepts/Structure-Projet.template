@@ -1,0 +1,31 @@
+# Structure Projet SILK
+
+## Organisation répertoires
+```
+{{PROJECT_NAME}}/
+├── 01-Manuscrit/           # Chapitres principaux
+├── 02-Personnages/         # Fiches personnages
+│   ├── Principaux/         # Protagonistes
+│   └── Secondaires/        # Support
+├── 03-Lieux/              # Descriptions environnements
+├── 04-Concepts/           # Mécaniques narratives
+├── 07-timeline/           # Chronologie événements
+├── 10-Lore/              # Univers étendu
+├── 20-Pitch-Editeurs/    # Documents commerciaux
+├── 21-Planning/          # Calendrier écriture
+├── 50-Sessions-Claude/   # Historique LLM
+├── 60-idees-tome-2/      # Extensions futures
+├── 99-Templates/         # Modèles réutilisables
+├── formats/              # Configuration publication
+└── outputs/              # Fichiers générés
+    ├── context/          # Contextes LLM
+    ├── publish/          # PDF/eBook
+    └── temp/             # Temporaires
+```
+
+## Workflow standard
+1. **Écriture** : Chapitres dans `01-Manuscrit/`
+2. **Développement** : Personnages et concepts
+3. **Analyse** : `silk context` pour LLM
+4. **Suivi** : `silk wordcount` progression
+5. **Publication** : `silk publish` formats

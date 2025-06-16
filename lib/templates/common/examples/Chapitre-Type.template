@@ -1,0 +1,24 @@
+# Ch.{{CHAPTER_NUMBER}} : {{CHAPTER_TITLE}}
+
+## Objectifs SILK
+- **Intrigue** : {{INTRIGUE_OBJECTIVE}}
+- **Développement** : {{CHARACTER_DEVELOPMENT}}
+- **Révélations** : {{REVELATIONS}}
+- **Tension** : {{TENSION_LEVEL}}
+
+## Personnages actifs
+- [[{{MAIN_CHARACTER}}]] : {{MAIN_ROLE}}
+- [[{{SECONDARY_CHARACTER}}]] : {{SECONDARY_ROLE}}
+
+## Liens narratifs
+← Ch.{{PREV_CHAPTER}} : {{PREVIOUS_LINK}}
+→ Ch.{{NEXT_CHAPTER}} : {{NEXT_LINK}}
+
+## Notes développement
+> {{DEVELOPMENT_NOTES}}
+
+## manuscrit
+
+[Début du chapitre...]
+
+{{CHAPTER_CONTENT}}

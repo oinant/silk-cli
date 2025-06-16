@@ -1,0 +1,37 @@
+# Exemple : Première Rencontre Romance
+
+## Contexte rencontre
+**Protagoniste A** : {{CHARACTER_A_NAME}}
+**Protagoniste B** : {{CHARACTER_B_NAME}}
+**Lieu** : {{MEETING_LOCATION}}
+**Circonstances** : {{MEETING_CIRCUMSTANCES}}
+
+## Objectifs scène
+- **Attraction** : {{ATTRACTION_ELEMENTS}}
+- **Obstacle** : {{INITIAL_CONFLICT}}
+- **Caractérisation** : {{PERSONALITY_REVEALS}}
+
+## Structure type
+```markdown
+## manuscrit
+
+{{CHARACTER_A_NAME}} {{SITUATION_SETUP}}.
+
+C'est alors que {{CHARACTER_B_NAME}} {{ENTRANCE_DESCRIPTION}}.
+
+{{FIRST_IMPRESSION_A}}
+
+"{{FIRST_WORDS_EXCHANGE}}"
+
+{{REACTION_AND_ATTRACTION}}
+
+Mais {{COMPLICATION_OR_OBSTACLE}}.
+
+[Développer la chimie et les obstacles...]
+```
+
+## Notes écriture
+- **Chimie** : Montrer, ne pas dire l'attraction
+- **Authenticité** : Réactions humaines crédibles
+- **Tension** : Équilibre attirance/résistance
+- **Promesse** : Planter graines du conflit romantique

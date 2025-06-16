@@ -1,0 +1,19 @@
+# Structure Narrative SILK
+
+## Architecture SILK
+- **Introduction** : Établissement monde et personnages
+- **Développement** : Progression conflits et relations
+- **Climax** : Point culminant tension narrative
+- **Résolution** : Dénouement et conclusions
+
+## Mécaniques récit
+- **Rythme** : Alternance tension/respiration
+- **Révélations** : Information progressive au lecteur
+- **Arcs personnages** : Évolution psychologique
+- **Thèmes** : Exploration cohérente des idées centrales
+
+## Outils SILK
+- Séparateur `## manuscrit` pour analyse LLM
+- Range syntax pour contexte ciblé
+- Templates personnages et chapitres
+- Publication multi-format automatisée

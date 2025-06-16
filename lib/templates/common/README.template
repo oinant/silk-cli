@@ -1,0 +1,37 @@
+# {{PROJECT_NAME}}
+
+**Genre**: {{GENRE}}  
+**Langue**: {{LANGUAGE}}  
+**Objectif**: {{TARGET_WORDS}} mots ({{TARGET_CHAPTERS}} chapitres)  
+**Auteur**: {{AUTHOR_NAME}}{{PROJECT_SUBTITLE}}
+
+Généré avec SILK CLI - Smart Integrated Literary Kit
+
+## Description
+
+[Description du projet à compléter]
+
+## Structure
+
+- `01-Manuscrit/` - Chapitres du manuscrit
+- `02-Personnages/` - Fiches personnages hiérarchisées  
+- `04-Concepts/` - Mécaniques narratives
+- `outputs/` - Fichiers générés (contexte LLM, PDF)
+
+## Workflow SILK
+
+```bash
+silk context              # Générer contexte pour LLM
+silk wordcount           # Statistiques progression  
+silk publish             # Générer PDF
+```
+
+## Git
+
+Ce projet utilise Git pour versioning et collaboration.
+Commits automatiques sur les milestone de progression.
+
+---
+
+*Tissé avec 🕷️ SILK - Smart Integrated Literary Kit*  
+*Structured Intelligence for Literary Kreation*
