@@ -8,9 +8,6 @@ classoption: [oneside]
 
 lang: fr-FR
 babel-lang: french
-polyglossia-lang:
-  name: french
-  options: [variant=french]
 
 indent: true
 parindent: 1.2em

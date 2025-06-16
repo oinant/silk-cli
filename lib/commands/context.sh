@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/commands/context.sh - Commande SILK context (version unifiée)
+# lib/commands/context.sh - Commande SILK context (FIXED)
 
 # Vérification chargement des dépendances
 if [[ "${SILK_CORE_UTILS_LOADED:-false}" != "true" ]]; then
@@ -40,7 +40,7 @@ cmd_context() {
     local backstory_file=""
     local prompt_file="prompt.md"
 
-    # Parser arguments pour détecter le mode prompt
+    # Parser arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help)
@@ -48,8 +48,12 @@ cmd_context() {
                 return 0
                 ;;
             -p|--prompt)
+                if [[ $# -lt 2 ]]; then
+                    log_error "Option -p/--prompt nécessite un argument"
+                    return 1
+                fi
                 local predefined_key="$2"
-                if [[ -n "${PREDEFINED_PROMPTS[$predefined_key]}" ]]; then
+                if [[ -n "${PREDEFINED_PROMPTS[$predefined_key]:-}" ]]; then
                     prompt_text="${PREDEFINED_PROMPTS[$predefined_key]}"
                     prompt_source="predefined:$predefined_key"
                     log_debug "Prompt prédéfini: $predefined_key"
@@ -61,7 +65,7 @@ cmd_context() {
                 shift 2
                 ;;
             --withpromptfile)
-                if [[ -n "$2" && "$2" != -* ]]; then
+                if [[ $# -ge 2 && "$2" != -* ]]; then
                     prompt_file="$2"
                     shift 2
                 else
@@ -79,13 +83,17 @@ cmd_context() {
                 fi
                 ;;
             -ch|--chapters)
+                if [[ $# -lt 2 ]]; then
+                    log_error "Option -ch/--chapters nécessite un argument"
+                    return 1
+                fi
                 chapter_range="$2"
                 log_debug "Range chapitres: $chapter_range"
                 shift 2
                 ;;
             --timeline|-tl)
                 include_timeline=true
-                if [[ -n "$2" && "$2" != -* ]]; then
+                if [[ $# -ge 2 && "$2" != -* ]]; then
                     timeline_file="$2"
                     shift 2
                 else
@@ -99,6 +107,10 @@ cmd_context() {
                 shift
                 ;;
             --mode)
+                if [[ $# -lt 2 ]]; then
+                    log_error "Option --mode nécessite un argument"
+                    return 1
+                fi
                 mode="$2"
                 case "$mode" in
                     nocontext|normal|full) ;;
@@ -111,7 +123,7 @@ cmd_context() {
                 shift 2
                 ;;
             --backstory)
-                if [[ -n "$2" && "$2" != -* ]]; then
+                if [[ $# -ge 2 && "$2" != -* ]]; then
                     backstory_file="$2"
                     shift 2
                 else
@@ -165,14 +177,15 @@ cmd_context() {
 
     log_info "🕸️ SILK tisse votre contexte unifié..."
 
-    generate_unified_context "$prompt_text" "$prompt_source" "$chapter_range" "$mode" "$include_timeline" "$include_wordcount" "$timeline_file" "$backstory_file" "$original_range"
+    # FIX: Utiliser des chaînes vides pour paramètres optionnels
+    generate_unified_context "$prompt_text" "$prompt_source" "$chapter_range" "$mode" "$include_timeline" "$include_wordcount" "${timeline_file:-}" "${backstory_file:-}" "$original_range"
 
     local duration=$(end_timer "$start_time")
 
     # Rapport final
     show_unified_report "$mode" "$chapter_range" "$duration" "$prompt_source"
 
-    return 0  # Force success exit code
+    return 0
 }
 
 # === AIDE CONTEXTE ===
@@ -488,7 +501,7 @@ add_characters_section() {
             echo "### 👥 Personnages secondaires" >> "$output_file"
 
             # Parcourir tous les fichiers dans Secondaires/ et ses sous-dossiers
-            find 02-Personnages/Secondaires -name "*.md" | while read -r file; do
+            find 02-Personnages/Secondaires -name "*.md" 2>/dev/null | while read -r file; do
                 if [[ -f "$file" ]]; then
                     local relative_path=$(echo "$file" | sed 's|02-Personnages/Secondaires/||')
                     {
@@ -623,11 +636,38 @@ add_wordcount_to_manuscript() {
         echo
         echo '```'
 
-        # Utiliser silk wordcount si disponible
-        if command -v silk &> /dev/null; then
-            silk wordcount --summary 2>/dev/null || echo "Erreur calcul statistiques"
+        # CORRECTION: Trouver le chemin vers silk depuis le projet
+        local silk_cmd=""
+        if [[ -x "../silk" ]]; then
+            silk_cmd="../silk"
+        elif [[ -x "../../silk" ]]; then
+            silk_cmd="../../silk"
+        elif command -v silk &> /dev/null; then
+            silk_cmd="silk"
+        fi
+
+        if [[ -n "$silk_cmd" ]] && is_silk_project; then
+            # Utiliser le script SILK wordcount en mode summary
+            local wordcount_output
+            if wordcount_output=$($silk_cmd wordcount --summary 2>&1); then
+                echo "$wordcount_output"
+            else
+                echo "Erreur lors du calcul des statistiques:"
+                echo "$wordcount_output"
+            fi
         else
-            echo "Statistiques non disponibles"
+            echo "Statistiques SILK non disponibles"
+            echo "Total chapitres manuscrit: $(ls 01-Manuscrit/*.md 2>/dev/null | wc -l)"
+
+            # Calcul simple sans silk
+            local total_words=0
+            for file in 01-Manuscrit/*.md; do
+                if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
+                    local words=$(sed -n '/## manuscrit/,$p' "$file" | tail -n +2 | wc -w)
+                    total_words=$((total_words + words))
+                fi
+            done
+            echo "Total mots approximatif: $total_words"
         fi
 
         echo '```'
@@ -645,6 +685,7 @@ extract_chapters_content() {
 
     log_debug "Extraction chapitres pour range: $chapter_range"
 
+    # Temporairement désactiver errexit pour cette section
     set +e
 
     for file in 01-Manuscrit/*.md; do
@@ -665,9 +706,10 @@ extract_chapters_content() {
         fi
     done
 
-    log_debug "Chapitres: $chapters_included inclus, $chapters_excluded exclus"
-
+    # Réactiver errexit
     set -e
+
+    log_debug "Chapitres: $chapters_included inclus, $chapters_excluded exclus"
 
     # Stocker stats pour le rapport
     export SILK_CONTEXT_INCLUDED="$chapters_included"
