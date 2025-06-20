@@ -100,7 +100,7 @@ cmd_publish() {
     fi
 
     # Vérifier dépendances sauf en dry-run
-    if [[ "$dry_run" == "false" ]] && ! check_publish_dependencies; then
+    if [[ "$dry_run" == "false" ]] && ! check_publish_dependencies "$format"; then
         show_dependency_help
         return 1
     fi
@@ -110,7 +110,7 @@ cmd_publish() {
     if [[ "$dry_run" == "true" ]]; then
         dry_run_publish "$format" "$max_chapters" "$output_name"
     else
-        generate_silk_pdf "$format" "$max_chapters" "$french_quotes" "$auto_dashes" "$output_name" "$include_toc" "$include_stats"
+        generate_silk_output "$format" "$max_chapters" "$french_quotes" "$auto_dashes" "$output_name" "$include_toc" "$include_stats"
     fi
 }
 
@@ -145,6 +145,7 @@ FORMATS SILK DISPONIBLES:
   iphone     Format mobile (4.7"×8.3", marges 0.3") - smartphone
   kindle     Format liseuse (5"×7.5", optimisé e-ink) - Kindle/Kobo
   book       Format livre papier (A5, marges optimisées) - impression
+  epub       Format EPUB mobile (reflowable, sans LaTeX requis)
 
 CONVENTIONS MANUSCRIT SILK:
   ~          → Blanc typographique (pause narrative)
@@ -155,6 +156,12 @@ CONVENTIONS MANUSCRIT SILK:
 DÉPENDANCES REQUISES:
   - Pandoc (https://pandoc.org/installing.html)
   - XeLaTeX (https://www.latex-project.org/get/)
+
+EPUB AVANTAGES:
+  ✅ Pas de LaTeX nécessaire
+  ✅ Texte adaptable à l'écran
+  ✅ Support natif mode sombre
+  ✅ Recherche et marque-pages intégrés
 
 SILK weaves your manuscript into beautiful PDF.
 HELP
@@ -181,8 +188,23 @@ validate_format() {
     return 0
 }
 
-# === VÉRIFICATION DÉPENDANCES ===
+detect_output_format() {
+    local format="$1"
+    local format_config="formats/$format.yaml"
+
+    # Lire le type de sortie depuis le YAML
+    if [[ -f "$format_config" ]]; then
+        local output_type=$(grep "^output_type:" "$format_config" | cut -d: -f2 | xargs)
+        echo "${output_type:-pdf}"  # PDF par défaut
+    else
+        echo "pdf"
+    fi
+}
+
+# 2. FONCTION check_dependencies() - MODIFIÉE
 check_publish_dependencies() {
+    local format="$1"
+    local output_type=$(detect_output_format "$format")
     local missing=0
 
     if ! command -v pandoc &> /dev/null; then
@@ -192,8 +214,9 @@ check_publish_dependencies() {
         log_debug "Pandoc trouvé: $(pandoc --version | head -1)"
     fi
 
-    if ! command -v xelatex &> /dev/null; then
-        log_error "XeLaTeX requis mais non trouvé"
+    # XeLaTeX seulement pour PDF
+    if [[ "$output_type" == "pdf" ]] && ! command -v xelatex &> /dev/null; then
+        log_error "XeLaTeX requis pour génération PDF"
         ((missing++))
     else
         log_debug "XeLaTeX trouvé: $(xelatex --version | head -1)"
@@ -379,8 +402,8 @@ cleanup_temp_directory() {
     set -e
 }
 
-# === GÉNÉRATION PDF AVEC NETTOYAGE ===
-generate_silk_pdf() {
+# === GÉNÉRATION OUTPUT UNIVERSEL (PDF/EPUB/HTML) ===
+generate_silk_output() {
     local format="$1"
     local max_chapters="$2"
     local french_quotes="$3"
@@ -389,34 +412,34 @@ generate_silk_pdf() {
     local include_toc="$6"
     local include_stats="$7"
 
-    local start_time=$(start_timer)
+    # Détecter le type de sortie depuis le YAML
+    local output_type=$(detect_output_format "$format")
     local timestamp=$(date +%Y%m%d-%H%M%S)
     local project_name=$(basename "$PWD")
 
-    log_debug "Début génération PDF: format=$format, max_chapters=$max_chapters"
+    # Extension basée sur le type de sortie
+    local extension
+    case "$output_type" in
+        "epub") extension="epub" ;;
+        "html") extension="html" ;;
+        *) extension="pdf" ;;
+    esac
 
-    ensure_directory "$PUBLISH_OUTPUT_DIR"
-    ensure_directory "$PUBLISH_TEMP_DIR"
-
-    # 🧹 NETTOYAGE AUTOMATIQUE DU DOSSIER TEMP
-    cleanup_temp_directory "$PUBLISH_TEMP_DIR"
-
-    # Générer nom de fichier CORRECTEMENT
+    # Nom de fichier
     local filename
     if [[ -n "$output_name" ]]; then
-        filename="$output_name"
-        # Ajouter .pdf si pas déjà présent
-        if [[ "$filename" != *.pdf ]]; then
-            filename="$filename.pdf"
-        fi
+        filename="${output_name}.${extension}"
     else
-        filename="${project_name}-SILK-${format}-${timestamp}.pdf"
+        filename="${project_name}-${format}-${timestamp}.${extension}"
         if [[ $max_chapters -ne 99 ]]; then
-            filename="${project_name}-SILK-${format}-Ch${max_chapters}-${timestamp}.pdf"
+            filename="${project_name}-${format}-Ch${max_chapters}-${timestamp}.${extension}"
         fi
     fi
 
-    log_debug "Nom fichier généré: $filename"
+    log_debug "Nom fichier généré: $filename (type: $output_type)"
+
+    # Créer les répertoires nécessaires
+    mkdir -p "$PUBLISH_OUTPUT_DIR" "$PUBLISH_TEMP_DIR"
 
     log_info "Préparation métadonnées de publication..."
 
@@ -427,7 +450,7 @@ generate_silk_pdf() {
 
     log_info "Collecte et nettoyage des chapitres..."
 
-    # CORRECTION CRITIQUE: Initialisation correcte du tableau associatif
+    # Collecte des chapitres (même logique que votre version actuelle)
     declare -A chapter_parts_map
     local clean_files=()
     local chapters_included=0
@@ -435,91 +458,34 @@ generate_silk_pdf() {
     # Phase 1: Identifier et regrouper tous les fichiers par chapitre de base
     log_debug "🔍 Phase 1: Identification chapitres..."
 
-    # DEBUG: Lister tous les fichiers d'abord
-    log_debug "📂 Fichiers trouvés dans 01-Manuscrit/:"
     for file in 01-Manuscrit/Ch*.md; do
-        if [[ -f "$file" ]]; then
-            log_debug "   📄 $(basename "$file")"
-        fi
-    done
+        if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
+            # Extraction robuste du numéro de chapitre
+            local file_basename=$(basename "$file")
+            local chapter_num=""
 
-    for file in 01-Manuscrit/Ch*.md; do
-        log_debug "🔍 DEBUT traitement fichier: $file"
-
-        if [[ -f "$file" ]]; then
-            log_debug "   ✅ Fichier existe: $file"
-
-            if grep -q "## manuscrit" "$file"; then
-                log_debug "   ✅ Marqueur manuscrit trouvé dans: $file"
-
-                # DEBUG: Test extract_chapter_number avec gestion d'erreur
-                local chapter_num=""
-                log_debug "   🔍 Extraction numéro chapitre..."
-
-                # Méthode robuste sans fonction externe
-                local file_basename=$(basename "$file")
-                if [[ "$file_basename" =~ ^[Cc]h([0-9]+) ]]; then
-                    chapter_num="${BASH_REMATCH[1]}"
-                    chapter_num=$(echo "$chapter_num" | sed 's/^0*//')  # Supprimer zéros
-                    log_debug "   ✅ Numéro extrait: '$chapter_num' pour $file_basename"
-                else
-                    log_debug "   ❌ Impossible d'extraire numéro de: $file_basename"
-                    chapter_num="0"
-                fi
-
-                log_debug "   🎯 Chapter_num='$chapter_num', max_chapters='$max_chapters'"
-
-                if [[ -n "$chapter_num" && "$chapter_num" != "0" ]]; then
-                    if [[ $chapter_num -le $max_chapters ]]; then
-                        log_debug "   ✅ Chapitre $chapter_num inclus (≤ $max_chapters)"
-
-                        # CORRECTION: Utilisation correcte du tableau associatif
-                        if [[ -z "${chapter_parts_map[$chapter_num]:-}" ]]; then
-                            chapter_parts_map[$chapter_num]="$file"
-                            log_debug "   📝 Nouveau chapitre: chapter_parts_map[$chapter_num]='$file'"
-                        else
-                            chapter_parts_map[$chapter_num]="${chapter_parts_map[$chapter_num]}|$file"
-                            log_debug "   📝 Ajout partie: chapter_parts_map[$chapter_num]='${chapter_parts_map[$chapter_num]}'"
-                        fi
-                    else
-                        log_debug "   ❌ Chapitre $chapter_num exclu (> $max_chapters)"
-                    fi
-                else
-                    log_debug "   ❌ Chapter_num invalide: '$chapter_num'"
-                fi
+            if [[ "$file_basename" =~ ^[Cc]h([0-9]+) ]]; then
+                chapter_num="${BASH_REMATCH[1]}"
+                chapter_num=$(echo "$chapter_num" | sed 's/^0*//')  # Supprimer zéros
             else
-                log_debug "   ❌ Pas de marqueur manuscrit dans: $file"
+                chapter_num="0"
             fi
-        else
-            log_debug "   ❌ Fichier n'existe pas: $file"
+
+            if [[ -n "$chapter_num" && "$chapter_num" != "0" && $chapter_num -le $max_chapters ]]; then
+                if [[ -z "${chapter_parts_map[$chapter_num]:-}" ]]; then
+                    chapter_parts_map[$chapter_num]="$file"
+                else
+                    chapter_parts_map[$chapter_num]="${chapter_parts_map[$chapter_num]}|$file"
+                fi
+                log_debug "   ✅ Ch$chapter_num ajouté: $(basename "$file")"
+            fi
         fi
-
-        log_debug "🔍 FIN traitement fichier: $file"
-        log_debug "   📊 Chapter_parts_map actuellement: ${!chapter_parts_map[*]}"
-    done
-
-    log_debug "📊 RÉSUMÉ Phase 1:"
-    log_debug "   Chapitres détectés: ${#chapter_parts_map[@]}"
-    for num in "${!chapter_parts_map[@]}"; do
-        local count=$(echo "${chapter_parts_map[$num]}" | tr '|' '\n' | wc -l)
-        log_debug "   Ch$num: $count partie(s)"
     done
 
     # Phase 2: Traiter chaque chapitre avec toutes ses parties
     log_debug "🔍 Phase 2: Traitement et combinaison..."
-    log_debug "📊 Chapitres à traiter: ${!chapter_parts_map[*]}"
 
-    # Compter combien de chapitres on a vraiment
-    local total_chapters=${#chapter_parts_map[@]}
-    log_debug "📊 Total chapitres détectés: $total_chapters"
-
-    if [[ $total_chapters -eq 0 ]]; then
-        log_error "❌ Aucun chapitre détecté en Phase 1 !"
-        log_error "   Vérifiez les noms de fichiers et marqueurs"
-        return 1
-    fi
-
-    # Temporairement désactiver errexit pour la boucle de traitement
+    # Temporairement désactiver errexit
     set +e
 
     for chapter_num in $(printf '%s\n' "${!chapter_parts_map[@]}" | sort -n); do
@@ -534,9 +500,7 @@ generate_silk_pdf() {
 
         # Combiner toutes les parties du chapitre
         for file in "${files_array[@]}"; do
-            log_debug "   📖 Ajout partie: $(basename "$file")"
-
-            # Extraire titre (prendre le premier trouvé ou le principal)
+            # Extraire titre
             if [[ -z "$chapter_title" ]] || [[ "$(basename "$file")" != *"-1-"* && "$(basename "$file")" != *"-2-"* ]]; then
                 chapter_title=$(head -n1 "$file" | sed 's/^#*\s*//')
             fi
@@ -546,10 +510,8 @@ generate_silk_pdf() {
             if part_content=$(extract_manuscript_content "$file"); then
                 if [[ -n "$part_content" ]]; then
                     combined_content+="$part_content"
-                    combined_content+=$'\n\n'  # Séparateur entre parties
+                    combined_content+=$'\n\n'
                 fi
-            else
-                log_warning "   ⚠️  Pas de contenu dans: $(basename "$file")"
             fi
         done
 
@@ -557,89 +519,92 @@ generate_silk_pdf() {
         if [[ -n "$combined_content" ]]; then
             local clean_file="$PUBLISH_TEMP_DIR/silk_clean_ch${chapter_num}_${timestamp}.md"
 
-            # Titre avec indication multi-parties si nécessaire
             local display_title="$chapter_title"
             if [[ $files_count -gt 1 ]]; then
                 display_title="$chapter_title (${files_count} parties)"
             fi
 
-            # Créer le fichier nettoyé
-            if create_clean_chapter_file "$clean_file" "$chapter_num" "$display_title" "$combined_content" "$french_quotes" "$auto_dashes"; then
+            # Créer le fichier nettoyé selon le type de sortie
+            if create_clean_chapter_file "$clean_file" "$chapter_num" "$display_title" "$combined_content" "$french_quotes" "$auto_dashes" "$output_type"; then
                 clean_files+=("$clean_file")
                 ((chapters_included++))
-
-                if [[ $files_count -gt 1 ]]; then
-                    echo "   ✅ Ch$chapter_num combiné ($files_count parties)"
-                else
-                    echo "   ✅ Ch$chapter_num préparé"
-                fi
-                log_debug "Chapitre ajouté: $clean_file"
-            else
-                log_warning "   ❌ Ch$chapter_num échec création fichier"
+                echo "   ✅ Ch$chapter_num préparé"
             fi
-        else
-            log_warning "   ❌ Ch$chapter_num sans contenu valide"
         fi
     done
 
     # Réactiver errexit
     set -e
 
-    log_debug "Chapitres collectés: $chapters_included"
-    log_debug "Fichiers clean: ${clean_files[*]}"
-
     if [[ $chapters_included -eq 0 ]]; then
         log_error "Aucun chapitre trouvé à publier"
-        log_error "Vérifiez que vos chapitres ont le marqueur '## manuscrit'"
         return 1
     fi
 
     # Ajouter page statistiques si demandée
     if [[ "$include_stats" == "true" ]]; then
         local stats_file="$PUBLISH_TEMP_DIR/silk_stats_${timestamp}.md"
-        create_stats_page "$stats_file" "$chapters_included"
+        create_stats_page "$stats_file" "$chapters_included" "$output_type"
         clean_files=("$stats_file" "${clean_files[@]}")
         log_debug "Page stats ajoutée: $stats_file"
     fi
 
-    # Le chemin de sortie doit pointer vers le PDF !
-    local output_pdf="$PUBLISH_OUTPUT_DIR/$filename"
+    # Chemin de sortie final
+    local output_file="$PUBLISH_OUTPUT_DIR/$filename"
 
-    log_info "🎯 Génération PDF avec Pandoc..."
+    log_info "🎯 Génération $output_type avec Pandoc..."
     log_debug "Fichiers d'entrée: ${clean_files[*]}"
     log_debug "Métadonnées: $merged_metadata"
-    log_debug "Sortie PDF: $output_pdf"
+    log_debug "Sortie: $output_file"
 
+    # Arguments Pandoc de base
     local pandoc_args=(
         "$merged_metadata"
         "${clean_files[@]}"
-        "-o" "$output_pdf"
-        "--pdf-engine=xelatex"
+        "-o" "$output_file"
         "-f" "markdown+smart"
-        "--highlight-style=tango"
     )
 
-    # Ajouter TOC si demandé
+    # Arguments spécifiques au type de sortie
+    case "$output_type" in
+        "pdf")
+            pandoc_args+=(
+                "--pdf-engine=xelatex"
+                "--highlight-style=tango"
+            )
+            ;;
+        "epub")
+            pandoc_args+=(
+                "--epub-chapter-level=2"
+            )
+            ;;
+        "html")
+            pandoc_args+=(
+                "--standalone"
+                "--self-contained"
+            )
+            ;;
+    esac
+
+    # Table des matières si demandée
     if [[ "$include_toc" == "true" ]]; then
         pandoc_args+=("--toc" "--toc-depth=1")
     fi
 
     log_debug "Commande Pandoc: pandoc ${pandoc_args[*]}"
 
-    # Capturer sortie d'erreur Pandoc
+    # Exécution Pandoc avec gestion d'erreur
     local pandoc_output
-    local pandoc_exit_code=0
-
     echo "🔄 Exécution Pandoc..."
+
     if pandoc_output=$(pandoc "${pandoc_args[@]}" 2>&1); then
         log_debug "Pandoc terminé avec succès"
-        log_debug "Sortie Pandoc: $pandoc_output"
 
-        if [[ -f "$output_pdf" ]]; then
+        if [[ -f "$output_file" ]]; then
             local duration=$(end_timer "$start_time")
-            show_publish_success "$output_pdf" "$filename" "$format" "$chapters_included" "$duration" "$french_quotes" "$auto_dashes"
+            show_publish_success "$output_file" "$filename" "$format" "$chapters_included" "$duration" "$french_quotes" "$auto_dashes" "$output_type"
 
-            # Nettoyage fichiers temporaires ACTUELS sauf en debug
+            # Nettoyage fichiers temporaires (sauf en debug)
             if [[ "${SILK_DEBUG:-false}" != "true" ]]; then
                 log_debug "Nettoyage fichiers temporaires de cette session"
                 rm -f "$merged_metadata" "${clean_files[@]}" 2>/dev/null || true
@@ -648,13 +613,12 @@ generate_silk_pdf() {
             fi
             return 0
         else
-            log_error "Pandoc s'est terminé sans erreur mais le PDF n'a pas été créé"
-            log_error "Fichier attendu: $output_pdf"
-            log_error "Sortie Pandoc: $pandoc_output"
+            log_error "Pandoc terminé mais le fichier n'a pas été créé"
+            log_error "Fichier attendu: $output_file"
             return 1
         fi
     else
-        pandoc_exit_code=$?
+        local pandoc_exit_code=$?
         log_error "Erreur Pandoc (code: $pandoc_exit_code)"
         echo
         echo "📋 SORTIE PANDOC:"
@@ -662,19 +626,174 @@ generate_silk_pdf() {
         echo
         echo "🔧 DEBUGGING:"
         echo "   1. Vérifiez les métadonnées: cat $merged_metadata"
-        echo "   2. Vérifiez un chapitre: head -20 ${clean_files[0]:-aucun}"
-        echo "   3. Test Pandoc manuel:"
+        echo "   2. Test manuel:"
         if [[ ${#clean_files[@]} -gt 0 ]]; then
-            echo "      pandoc $merged_metadata ${clean_files[0]} -o test.pdf --pdf-engine=xelatex"
-        else
-            echo "      Aucun fichier chapitre généré à tester"
+            echo "      pandoc $merged_metadata ${clean_files[0]} -o test.$extension"
         fi
-        echo "   4. Vérifiez XeLaTeX: xelatex --version"
         echo
-        echo "💡 Fichiers temporaires conservés dans: $PUBLISH_TEMP_DIR"
         return 1
     fi
 }
+
+# === FONCTION UTILITAIRE POUR EXTRACTION CONTENU ===
+extract_manuscript_content() {
+    local file="$1"
+
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+
+    # Extraire tout après "## manuscrit"
+    sed -n '/## manuscrit/,$p' "$file" | tail -n +2
+}
+
+# === FONCTION CRÉATION FICHIER NETTOYÉ ADAPTÉE ===
+create_clean_chapter_file() {
+    local output_file="$1"
+    local chapter_num="$2"
+    local chapter_title="$3"
+    local content="$4"
+    local french_quotes="$5"
+    local auto_dashes="$6"
+    local output_type="${7:-pdf}"
+
+    log_debug "📝 Création fichier nettoyé: $output_file (type: $output_type)"
+
+    # En-tête selon le type de sortie
+    case "$output_type" in
+        "epub"|"html")
+            # Pour EPUB/HTML, pas de commandes LaTeX
+            if [[ $chapter_num -gt 1 ]]; then
+                echo "" > "$output_file"
+            else
+                echo "" > "$output_file"
+            fi
+            ;;
+        "pdf")
+            # Pour PDF, commandes LaTeX OK
+            if [[ $chapter_num -gt 1 ]]; then
+                echo "\\newpage" > "$output_file"
+                echo "" >> "$output_file"
+            else
+                echo "" > "$output_file"
+            fi
+            ;;
+    esac
+
+    # Titre du chapitre
+    echo "# $chapter_title" >> "$output_file"
+    echo "" >> "$output_file"
+
+    # Traitement du contenu ligne par ligne
+    while IFS= read -r line; do
+        process_silk_line "$line" "$output_file" "$french_quotes" "$auto_dashes" "$output_type"
+    done <<< "$content"
+
+    log_debug "✅ Fichier nettoyé créé: $output_file"
+    return 0
+}
+
+# === FONCTION TRAITEMENT LIGNE ADAPTÉE ===
+process_silk_line() {
+    local line="$1"
+    local output="$2"
+    local french_quotes="$3"
+    local auto_dashes="$4"
+    local output_type="${5:-pdf}"
+
+    # Traitement des séparateurs spéciaux SILK
+    if [[ "$line" == "---" ]]; then
+        # Transition de scène
+        echo "" >> "$output"
+        case "$output_type" in
+            "epub"|"html")
+                echo "***" >> "$output"
+                ;;
+            "pdf")
+                echo "\\begin{center}" >> "$output"
+                echo "\\vspace{1cm}" >> "$output"
+                echo "***" >> "$output"
+                echo "\\vspace{1cm}" >> "$output"
+                echo "\\end{center}" >> "$output"
+                ;;
+        esac
+        echo "" >> "$output"
+
+    elif [[ "$line" == "~" ]]; then
+        # Blanc typographique
+        echo "" >> "$output"
+        case "$output_type" in
+            "epub"|"html")
+                echo "" >> "$output"
+                ;;
+            "pdf")
+                echo "\\vspace{0.5cm}" >> "$output"
+                ;;
+        esac
+        echo "" >> "$output"
+
+    elif [[ "$line" =~ ^\*.*\*$ ]] && [[ "$line" =~ \- ]]; then
+        # Indications temporelles (*Lundi matin - Bureau*)
+        echo "" >> "$output"
+        case "$output_type" in
+            "epub"|"html")
+                echo "*${line:1:-1}*" >> "$output"
+                ;;
+            "pdf")
+                echo "\\begin{center}" >> "$output"
+                echo "\\textit{${line:1:-1}}" >> "$output"
+                echo "\\end{center}" >> "$output"
+                ;;
+        esac
+        echo "" >> "$output"
+
+    elif [[ -z "$line" ]]; then
+        echo "" >> "$output"
+
+    else
+        # Ligne normale
+        local processed_line="$line"
+
+        # Conversion guillemets français si demandé
+        if [[ "$french_quotes" == "true" ]]; then
+            processed_line=$(echo "$processed_line" | sed 's/"([^"]*)"/« \1 »/g')
+        fi
+
+        # Ajout tirets cadratins si demandé
+        if [[ "$auto_dashes" == "true" ]]; then
+            case "$output_type" in
+                "epub"|"html")
+                    # Pour EPUB/HTML, utiliser le vrai caractère em-dash
+                    processed_line=$(echo "$processed_line" | sed 's/—/—/g')
+                    processed_line=$(echo "$processed_line" | sed 's/^- /— /g')
+                    ;;
+                "pdf")
+                    # Pour PDF, utiliser la commande LaTeX
+                    processed_line=$(echo "$processed_line" | sed 's/—/---/g')
+                    processed_line=$(echo "$processed_line" | sed 's/^- /--- /g')
+                    ;;
+            esac
+        fi
+
+        # Conversion liens Obsidian [[liens]]
+        processed_line=$(echo "$processed_line" | sed -e 's/\[\[\([^|]*\)|\([^]]*\)\]\]/\2/g' -e 's/\[\[\([^]]*\)\]\]/\1/g')
+
+        # Gestion indentation dialogues selon le type
+        case "$output_type" in
+            "epub"|"html")
+                echo "$processed_line" >> "$output"
+                ;;
+            "pdf")
+                if [[ "$processed_line" =~ ^[\"«—] ]]; then
+                    echo "\\noindent $processed_line  " >> "$output"
+                else
+                    echo "$processed_line  " >> "$output"
+                fi
+                ;;
+        esac
+    fi
+}
+
 
 # === COMMANDE DE NETTOYAGE MANUEL ===
 cmd_cleanup_temp() {
@@ -739,43 +858,111 @@ HELP
 }
 
 # === MÉTADONNÉES ===
+# === MODIFICATION DE create_merged_metadata() ===
 create_merged_metadata() {
     local format="$1"
     local output_file="$2"
     local project_name="$3"
 
+    # Détecter l'image de couverture
+    local cover_image=""
+    local cover_candidates=(
+        "cover.jpg" "cover.png" "cover.jpeg"
+        "couverture.jpg" "couverture.png"
+        "Cover.jpg" "Cover.png"
+        "assets/cover.jpg" "assets/cover.png"
+        "images/cover.jpg" "images/cover.png"
+    )
+
+    for candidate in "${cover_candidates[@]}"; do
+        if [[ -f "$candidate" ]]; then
+            cover_image="$candidate"
+            log_debug "🎨 Couverture trouvée: $cover_image"
+            break
+        fi
+    done
+
+    if [[ -z "$cover_image" ]]; then
+        log_debug "📷 Aucune couverture trouvée (cherché: ${cover_candidates[*]})"
+    fi
+
     {
         echo "---"
 
-        # Base metadata ou fallback
+        # Base metadata avec substitutions
         if [[ -f "formats/base.yaml" ]]; then
-            # Exclure header-includes de base.yaml pour éviter conflit
-            grep -v "^header-includes:" "formats/base.yaml" | grep -v "^  " || {
-                echo "title: \"$project_name\""
-                echo "author: \"${SILK_AUTHOR_NAME:-Auteur}\""
-                echo "date: \"$(date '+%Y-%m-%d')\""
-                echo "lang: fr-FR"
-                echo "documentclass: book"
-            }
+            while IFS= read -r line; do
+                # Substitutions des variables
+                line=$(echo "$line" | sed "s/{{TITLE}}/$project_name/g")
+                line=$(echo "$line" | sed "s/{{AUTHOR}}/${SILK_AUTHOR_NAME:-Auteur}/g")
+                line=$(echo "$line" | sed "s/{{DATE}}/$(date '+%Y-%m-%d')/g")
+                line=$(echo "$line" | sed "s|{{COVER_IMAGE}}|$cover_image|g")
+
+                # Exclure header-includes pour éviter conflit
+                if [[ ! "$line" =~ ^header-includes: ]] && [[ ! "$line" =~ ^[[:space:]]*- ]]; then
+                    echo "$line"
+                fi
+            done < "formats/base.yaml"
         else
+            # Fallback sans base.yaml
             echo "title: \"$project_name\""
             echo "author: \"${SILK_AUTHOR_NAME:-Auteur}\""
             echo "date: \"$(date '+%Y-%m-%d')\""
             echo "lang: fr-FR"
-            echo "documentclass: book"
+            if [[ -n "$cover_image" ]]; then
+                echo "epub-cover-image: \"$cover_image\""
+            fi
         fi
 
         echo ""
 
-        # Format specific (avec header-includes fusionné)
+        # Format specific avec substitutions
         if [[ -f "formats/$format.yaml" ]]; then
-            cat "formats/$format.yaml"
+            while IFS= read -r line; do
+                line=$(echo "$line" | sed "s/{{TITLE}}/$project_name/g")
+                line=$(echo "$line" | sed "s/{{AUTHOR}}/${SILK_AUTHOR_NAME:-Auteur}/g")
+                line=$(echo "$line" | sed "s/{{DATE}}/$(date '+%Y-%m-%d')/g")
+                line=$(echo "$line" | sed "s|{{COVER_IMAGE}}|$cover_image|g")
+
+                # Omettre epub-cover-image si pas d'image trouvée
+                if [[ "$line" =~ ^epub-cover-image: ]] && [[ -z "$cover_image" ]]; then
+                    continue
+                fi
+
+                echo "$line"
+            done < "formats/$format.yaml"
         fi
 
         echo "---"
     } > "$output_file"
 }
 
+# === OPTION : PARAMÈTRE COVER EXPLICITE ===
+# Vous pouvez aussi ajouter une option à cmd_publish() :
+
+# Dans cmd_publish(), ajouter :
+# --cover)
+#     if [[ $# -lt 2 ]]; then
+#         log_error "Option --cover nécessite un chemin vers l'image"
+#         return 1
+#     fi
+#     export SILK_COVER_IMAGE="$2"
+#     shift 2
+#     ;;
+
+# Et dans create_merged_metadata() :
+# cover_image="${SILK_COVER_IMAGE:-$cover_image}"
+
+# === STRUCTURE RECOMMANDÉE PROJET SILK ===
+# Mon-Projet/
+# ├── cover.jpg                 # ← Couverture auto-détectée
+# ├── formats/
+# │   ├── base.yaml
+# │   └── epub.yaml
+# ├── 01-Manuscrit/
+# │   ├── Ch01.md
+# │   └── Ch02.md
+# └── outputs/
 
 # === TRAITEMENT LIGNE SILK ===
 process_silk_line() {
@@ -914,35 +1101,36 @@ create_stats_page() {
 
 # === RAPPORT SUCCESS ===
 show_publish_success() {
-    local output_pdf="$1"
+    local output_file="$1"
     local filename="$2"
     local format="$3"
     local chapters_included="$4"
     local duration="$5"
     local french_quotes="$6"
     local auto_dashes="$7"
+    local output_type="${8:-pdf}"
 
     echo
-    log_success "🕸️ PDF généré en $duration"
+    log_success "📚 ${output_type^^} généré: $output_file"
 
     echo
     echo "📊 RÉSUMÉ PUBLICATION:"
     echo "   📖 Fichier: $filename"
-    echo "   🎯 Format: $format"
+    echo "   🎯 Format: $format ($output_type)"
     echo "   📚 Chapitres: $chapters_included"
     echo "   🇫🇷 Guillemets français: $(if [[ "$french_quotes" == "true" ]]; then echo "OUI"; else echo "NON"; fi)"
     echo "   💬 Tirets automatiques: $(if [[ "$auto_dashes" == "true" ]]; then echo "OUI"; else echo "NON"; fi)"
 
-    if [[ -f "$output_pdf" ]]; then
+    if [[ -f "$output_file" ]]; then
         # Calculer taille fichier
         if command -v stat &> /dev/null; then
             local file_size
             case "$(detect_os)" in
                 "macos")
-                    file_size=$(stat -f%z "$output_pdf" 2>/dev/null || echo "0")
+                    file_size=$(stat -f%z "$output_file" 2>/dev/null || echo "0")
                     ;;
                 *)
-                    file_size=$(stat -c%s "$output_pdf" 2>/dev/null || echo "0")
+                    file_size=$(stat -c%s "$output_file" 2>/dev/null || echo "0")
                     ;;
             esac
             local size_mb=$((file_size / 1024 / 1024))
@@ -952,7 +1140,7 @@ show_publish_success() {
 
     echo
     echo "📁 FICHIER GÉNÉRÉ:"
-    echo "   🕸️ $output_pdf"
+    echo "   🕸️ $output_file"
     echo
     echo "💡 PROCHAINES ÉTAPES:"
     echo "   📱 Test sur appareil cible"
