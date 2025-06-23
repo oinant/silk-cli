@@ -101,6 +101,8 @@ load_core_modules() {
         "config.sh"
         "vault.sh"
         "templates.sh"
+        "chapters.sh"
+        "custom_html.sh"
     )
 
     log_debug "Chargement modules core..."
