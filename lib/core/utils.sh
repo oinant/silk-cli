@@ -211,42 +211,39 @@ is_chapter_in_range() {
     local chapter_num="$1"
     local range="$2"
 
-    log_debug "🎯 is_chapter_in_range: ch='$chapter_num', range='$range'"
-
-    # Si "all", inclure tout
-    if [[ "$range" == "all" ]]; then
-        log_debug "✅ Range 'all' - inclus"
-        return 0
-    fi
-
-    # Vérifier si le chapitre_num est vide ou non numérique
-    if [[ -z "$chapter_num" ]] || ! [[ "$chapter_num" =~ ^[0-9]+$ ]]; then
-        log_debug "❌ Chapitre invalide: '$chapter_num'"
-        return 1
-    fi
-
     # Support pour liste de chapitres séparés par ,
     if [[ "$range" == *","* ]]; then
         log_debug "🔍 Range avec virgules: $range"
         IFS=',' read -ra chapter_list <<< "$range"
         for ch in "${chapter_list[@]}"; do
             ch=$(echo "$ch" | tr -d ' ')
-            log_debug "  Comparaison: $chapter_num == $ch"
-            if [[ "$chapter_num" -eq "$ch" ]]; then
-                log_debug "✅ Match trouvé dans liste"
-                return 0
+            log_debug "  Comparaison: $chapter_num avec $ch"
+
+            # Vérifier si ch est une range (contient -)
+            if [[ "$ch" == *"-"* ]]; then
+                local start_ch=$(echo "$ch" | cut -d'-' -f1)
+                local end_ch=$(echo "$ch" | cut -d'-' -f2)
+                log_debug "    Range dans liste: $start_ch-$end_ch"
+                if [[ "$chapter_num" -ge "$start_ch" ]] && [[ "$chapter_num" -le "$end_ch" ]]; then
+                    log_debug "✅ Match trouvé dans range de liste"
+                    return 0
+                fi
+            else
+                if [[ "$chapter_num" -eq "$ch" ]]; then
+                    log_debug "✅ Match trouvé dans liste"
+                    return 0
+                fi
             fi
         done
         log_debug "❌ Pas de match dans liste"
         return 1
     fi
 
-    # Support pour range (ex: "1-30")
+    # Support pour range simple (ex: "1-30")
     if [[ "$range" == *"-"* ]]; then
         local start_ch=$(echo "$range" | cut -d'-' -f1)
         local end_ch=$(echo "$range" | cut -d'-' -f2)
         log_debug "🔍 Range numérique: $start_ch-$end_ch"
-        log_debug "  Test: $chapter_num >= $start_ch && $chapter_num <= $end_ch"
 
         if [[ "$chapter_num" -ge "$start_ch" ]] && [[ "$chapter_num" -le "$end_ch" ]]; then
             log_debug "✅ Dans range numérique"
@@ -256,9 +253,8 @@ is_chapter_in_range() {
             return 1
         fi
     else
-        # Range d'un seul chapitre (ex: "28")
+        # Range d'un seul chapitre
         log_debug "🔍 Range simple: $range"
-        log_debug "  Test: $chapter_num == $range"
         if [[ "$chapter_num" -eq "$range" ]]; then
             log_debug "✅ Match exact"
             return 0

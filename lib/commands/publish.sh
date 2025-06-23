@@ -28,6 +28,7 @@ cmd_publish() {
     local include_toc=true
     local include_stats=false
     local dry_run=false
+    local embeddable=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -79,6 +80,10 @@ cmd_publish() {
                 dry_run=true
                 shift
                 ;;
+            --embeddable)
+                embeddable=true
+                shift
+                ;;
             -*)
                 log_error "Option inconnue: $1"
                 show_publish_help
@@ -110,7 +115,8 @@ cmd_publish() {
     if [[ "$dry_run" == "true" ]]; then
         dry_run_publish "$format" "$max_chapters" "$output_name"
     else
-        generate_silk_output "$format" "$max_chapters" "$french_quotes" "$auto_dashes" "$output_name" "$include_toc" "$include_stats"
+        #generate_silk_output "$format" "$max_chapters" "$french_quotes" "$auto_dashes" "$output_name" "$include_toc" "$include_stats"
+        generate_silk_output "$format" "$max_chapters" "$french_quotes" "$auto_dashes" "$output_name" "$include_toc" "$include_stats" "$embeddable"
     fi
 }
 
@@ -129,6 +135,7 @@ OPTIONS:
   --french-quotes           Utiliser guillemets français « »
   --auto-dashes             Ajouter tirets cadratins aux dialogues
   --no-toc                  Ne pas inclure table des matières
+  --embeddable              Générer fragment HTML sans <html>/<body> (HTML)
   --with-stats              Inclure page de statistiques
   --dry-run                 Simulation sans génération PDF
   -h, --help                Afficher cette aide
@@ -139,6 +146,7 @@ EXEMPLES:
   silk publish --french-quotes           # Guillemets français
   silk publish -f book --auto-dashes     # Format livre avec tirets
   silk publish --dry-run                 # Test sans génération
+  silk publish -f html --embeddable      # Fragment HTML pour intégration
 
 FORMATS SILK DISPONIBLES:
   digital    Format écran (6"×9", marges 0.5") - lecture confortable
@@ -146,6 +154,7 @@ FORMATS SILK DISPONIBLES:
   kindle     Format liseuse (5"×7.5", optimisé e-ink) - Kindle/Kobo
   book       Format livre papier (A5, marges optimisées) - impression
   epub       Format EPUB mobile (reflowable, sans LaTeX requis)
+  html       Format HTML brut
 
 CONVENTIONS MANUSCRIT SILK:
   ~          → Blanc typographique (pause narrative)
@@ -411,6 +420,9 @@ generate_silk_output() {
     local output_name="$5"
     local include_toc="$6"
     local include_stats="$7"
+    local embeddable="$8"
+
+    local start_time=$(start_timer)
 
     # Détecter le type de sortie depuis le YAML
     local output_type=$(detect_output_format "$format")
@@ -425,14 +437,34 @@ generate_silk_output() {
         *) extension="pdf" ;;
     esac
 
+    # Ajustements spécifiques HTML
+    if [[ "$output_type" == "html" ]]; then
+
+        # Gérer --embeddable
+        if [[ "$embeddable" == "true" ]]; then
+            log_debug "Mode embeddable activé - génération fragment HTML"
+        fi
+    fi
+
     # Nom de fichier
     local filename
     if [[ -n "$output_name" ]]; then
         filename="${output_name}.${extension}"
     else
-        filename="${project_name}-${format}-${timestamp}.${extension}"
-        if [[ $max_chapters -ne 99 ]]; then
-            filename="${project_name}-${format}-Ch${max_chapters}-${timestamp}.${extension}"
+        if [[ "$max_chapters" != "99" ]]; then
+            # Utiliser la même logique que context pour le nommage
+            local chapter_suffix=""
+            if [[ "$max_chapters" == *","* ]]; then
+                # Liste de chapitres : Ch1,5,10
+                chapter_suffix="Ch$(echo "$max_chapters" | tr ',' '-')"
+            elif [[ "$max_chapters" == *"-"* ]]; then
+                # Range : Ch1-10
+                chapter_suffix="Ch${max_chapters}"
+            else
+                # Chapitre unique : Ch5
+                chapter_suffix="Ch${max_chapters}"
+            fi
+            filename="${project_name}-${format}-${chapter_suffix}-${timestamp}.${extension}"
         fi
     fi
 
@@ -445,7 +477,7 @@ generate_silk_output() {
 
     # Créer métadonnées fusionnées
     local merged_metadata="$PUBLISH_TEMP_DIR/silk_merged_${format}_${timestamp}.yaml"
-    create_merged_metadata "$format" "$merged_metadata" "$project_name"
+    create_merged_metadata "$format" "$merged_metadata" "$project_name" "$include_toc" "$embeddable"
     log_debug "Métadonnées créées: $merged_metadata"
 
     log_info "Collecte et nettoyage des chapitres..."
@@ -471,7 +503,7 @@ generate_silk_output() {
                 chapter_num="0"
             fi
 
-            if [[ -n "$chapter_num" && "$chapter_num" != "0" && $chapter_num -le $max_chapters ]]; then
+            if [[ -n "$chapter_num" && "$chapter_num" != "0" ]] && is_chapter_in_range "$chapter_num" "$max_chapters"; then
                 if [[ -z "${chapter_parts_map[$chapter_num]:-}" ]]; then
                     chapter_parts_map[$chapter_num]="$file"
                 else
@@ -857,12 +889,16 @@ HELP
     fi
 }
 
-# === MÉTADONNÉES ===
-# === MODIFICATION DE create_merged_metadata() ===
+# === MÉTADONNÉES AVEC GESTION HTML ===
 create_merged_metadata() {
     local format="$1"
     local output_file="$2"
     local project_name="$3"
+    local include_toc="${4:-true}"
+    local embeddable="${5:-false}"
+
+    # Détecter le type de sortie
+    local output_type=$(detect_output_format "$format")
 
     # Détecter l'image de couverture
     local cover_image=""
@@ -885,6 +921,8 @@ create_merged_metadata() {
     if [[ -z "$cover_image" ]]; then
         log_debug "📷 Aucune couverture trouvée (cherché: ${cover_candidates[*]})"
     fi
+
+    log_debug "Création métadonnées: format=$format, type=$output_type, toc=$include_toc, embeddable=$embeddable"
 
     {
         echo "---"
@@ -916,9 +954,10 @@ create_merged_metadata() {
 
         echo ""
 
-        # Format specific avec substitutions
+        # Format specific avec substitutions et gestion HTML
         if [[ -f "formats/$format.yaml" ]]; then
             while IFS= read -r line; do
+                # Substitutions template standard
                 line=$(echo "$line" | sed "s/{{TITLE}}/$project_name/g")
                 line=$(echo "$line" | sed "s/{{AUTHOR}}/${SILK_AUTHOR_NAME:-Auteur}/g")
                 line=$(echo "$line" | sed "s/{{DATE}}/$(date '+%Y-%m-%d')/g")
@@ -929,40 +968,37 @@ create_merged_metadata() {
                     continue
                 fi
 
+                # === GESTION SPÉCIFIQUE HTML ===
+                if [[ "$output_type" == "html" ]]; then
+                    # Gérer table-of-contents dynamiquement
+                    if [[ "$line" =~ ^table-of-contents: ]]; then
+                        echo "table-of-contents: $include_toc"
+                        continue
+                    fi
+
+                    # Gérer standalone pour embeddable
+                    if [[ "$line" =~ ^standalone: ]] && [[ "$embeddable" == "true" ]]; then
+                        echo "standalone: false"
+                        continue
+                    fi
+
+                    # Gérer self-contained pour embeddable
+                    if [[ "$line" =~ ^self-contained: ]] && [[ "$embeddable" == "true" ]]; then
+                        echo "self-contained: false"
+                        continue
+                    fi
+                fi
+
+                # Ligne normale
                 echo "$line"
             done < "formats/$format.yaml"
         fi
 
         echo "---"
     } > "$output_file"
+
+    log_debug "✅ Métadonnées créées: $output_file"
 }
-
-# === OPTION : PARAMÈTRE COVER EXPLICITE ===
-# Vous pouvez aussi ajouter une option à cmd_publish() :
-
-# Dans cmd_publish(), ajouter :
-# --cover)
-#     if [[ $# -lt 2 ]]; then
-#         log_error "Option --cover nécessite un chemin vers l'image"
-#         return 1
-#     fi
-#     export SILK_COVER_IMAGE="$2"
-#     shift 2
-#     ;;
-
-# Et dans create_merged_metadata() :
-# cover_image="${SILK_COVER_IMAGE:-$cover_image}"
-
-# === STRUCTURE RECOMMANDÉE PROJET SILK ===
-# Mon-Projet/
-# ├── cover.jpg                 # ← Couverture auto-détectée
-# ├── formats/
-# │   ├── base.yaml
-# │   └── epub.yaml
-# ├── 01-Manuscrit/
-# │   ├── Ch01.md
-# │   └── Ch02.md
-# └── outputs/
 
 # === TRAITEMENT LIGNE SILK ===
 process_silk_line() {

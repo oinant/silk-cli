@@ -1,0 +1,279 @@
+# Format HTML pour SILK - Page web complète
+output_type: html
+
+# Options Pandoc pour HTML
+standalone: true
+self-contained: true
+html-q-tags: true
+section-divs: true
+wrap: preserve
+
+# Métadonnées HTML
+lang: fr-FR
+title-prefix: "SILK"
+
+# CSS intégré pour rendu élégant
+css: |
+  /* === TYPOGRAPHIE FRANÇAISE === */
+  body {
+    font-family: Georgia, "Minion Pro", "Times New Roman", serif;
+    font-size: 18px;
+    line-height: 1.6;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: #fefefe;
+    color: #2c2c2c;
+    text-align: justify;
+    hyphens: auto;
+  }
+
+  /* === TITRES === */
+  h1, h2, h3, h4 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-weight: 600;
+    margin-top: 2em;
+    margin-bottom: 0.8em;
+    color: #1a1a1a;
+  }
+
+  h1 {
+    font-size: 2.2em;
+    text-align: center;
+    margin-top: 1em;
+    margin-bottom: 1.5em;
+    border-bottom: 3px solid #e0e0e0;
+    padding-bottom: 0.5em;
+    page-break-before: always;
+  }
+
+  h2 {
+    font-size: 1.6em;
+    margin-top: 2.5em;
+    color: #333;
+  }
+
+  h3 {
+    font-size: 1.3em;
+    color: #555;
+  }
+
+  /* === PARAGRAPHES STYLE FRANÇAIS === */
+  p {
+    margin: 0 0 0.5em 0;
+    text-indent: 1.5em;
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Premier paragraphe après titre sans indentation */
+  h1 + p, h2 + p, h3 + p,
+  .no-indent, .chapter-start {
+    text-indent: 0;
+    margin-top: 0.8em;
+  }
+
+  /* === DIALOGUES ET EMPHASIS === */
+  p:has(> em:first-child),
+  p[data-dialogue="true"] {
+    text-indent: 0;
+    margin-left: 2em;
+    font-style: italic;
+  }
+
+  em {
+    font-style: italic;
+    font-weight: normal;
+  }
+
+  strong {
+    font-weight: bold;
+    color: #1a1a1a;
+  }
+
+  /* === SÉPARATEURS DE SCÈNE === */
+  hr {
+    border: none;
+    text-align: center;
+    margin: 3em 0;
+    page-break-inside: avoid;
+  }
+
+  hr:after {
+    content: "⁂";
+    font-size: 2em;
+    color: #888;
+    letter-spacing: 0.3em;
+  }
+
+  /* Séparateur simple pour --- */
+  .scene-break {
+    text-align: center;
+    margin: 2em 0;
+    font-size: 1.5em;
+    color: #666;
+  }
+
+  /* === ESPACES TYPOGRAPHIQUES === */
+  .blank-space {
+    height: 2em;
+    display: block;
+  }
+
+  /* === INDICATIONS TEMPORELLES === */
+  .time-location {
+    text-align: center;
+    font-style: italic;
+    margin: 2em 0;
+    color: #666;
+    font-size: 0.95em;
+  }
+
+  /* === NAVIGATION ET STRUCTURE === */
+  nav#TOC {
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    font-size: 0.9em;
+  }
+
+  nav#TOC h2 {
+    margin-top: 0;
+    font-size: 1.2em;
+    color: #444;
+  }
+
+  nav#TOC ul {
+    margin: 0;
+    padding-left: 1.5em;
+  }
+
+  nav#TOC li {
+    margin: 0.3em 0;
+  }
+
+  nav#TOC a {
+    color: #0066cc;
+    text-decoration: none;
+  }
+
+  nav#TOC a:hover {
+    text-decoration: underline;
+  }
+
+  /* === RESPONSIVE DESIGN === */
+  @media screen and (max-width: 768px) {
+    body {
+      font-size: 16px;
+      padding: 1rem;
+      margin: 0;
+    }
+
+    h1 { font-size: 1.8em; }
+    h2 { font-size: 1.4em; }
+
+    p { text-indent: 1em; }
+
+    nav#TOC {
+      margin: 1rem 0;
+      padding: 1rem;
+    }
+  }
+
+  /* === MODE SOMBRE === */
+  @media (prefers-color-scheme: dark) {
+    body {
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    h1, h2, h3, h4 {
+      color: #f0f0f0;
+    }
+
+    h1 {
+      border-bottom-color: #444;
+    }
+
+    nav#TOC {
+      background: #2a2a2a;
+      border-color: #444;
+    }
+
+    nav#TOC h2 {
+      color: #ccc;
+    }
+
+    nav#TOC a {
+      color: #66b3ff;
+    }
+
+    .time-location {
+      color: #aaa;
+    }
+
+    hr:after {
+      color: #666;
+    }
+
+    .scene-break {
+      color: #888;
+    }
+  }
+
+  /* === IMPRESSION === */
+  @media print {
+    body {
+      font-size: 12pt;
+      line-height: 1.4;
+      max-width: none;
+      margin: 0;
+      padding: 1cm;
+    }
+
+    h1 {
+      page-break-before: always;
+      font-size: 18pt;
+    }
+
+    h2 {
+      page-break-after: avoid;
+      font-size: 14pt;
+    }
+
+    p {
+      orphans: 3;
+      widows: 3;
+    }
+
+    nav#TOC {
+      page-break-after: always;
+    }
+  }
+
+# Variables de template
+variables:
+  documentclass: article
+  geometry: margin=1in
+  fontsize: 12pt
+  mainfont: Georgia
+  monofont: "SF Mono"
+
+# Options de génération
+table-of-contents: true
+toc-depth: 2
+number-sections: false
+
+# Filtres Pandoc (optionnels)
+# filters:
+#   - pandoc-crossref
+
+# Métadonnées personnalisables
+title: "{{TITLE}}"
+author: "{{AUTHOR}}"
+date: "{{DATE}}"
+subject: "Manuscrit SILK"
+keywords: ["fiction", "roman", "SILK"]
+description: "Manuscrit généré avec SILK - Intelligence for Literary Kreation"

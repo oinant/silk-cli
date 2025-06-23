@@ -44,6 +44,8 @@ cmd_context() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help)
+                log_info "debug activé ?"
+                log_debug "debug activé"
                 show_context_help
                 return 0
                 ;;
