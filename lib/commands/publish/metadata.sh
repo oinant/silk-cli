@@ -41,6 +41,7 @@ create_merged_metadata() {
 
         # Base metadata avec substitutions
         if [[ -f "formats/base.yaml" ]]; then
+            local header_includes_section=false
             while IFS= read -r line; do
                 # Substitutions des variables
                 line=$(echo "$line" | sed "s/{{TITLE}}/$project_name/g")
@@ -49,7 +50,22 @@ create_merged_metadata() {
                 line=$(echo "$line" | sed "s|{{COVER_IMAGE}}|$cover_image|g")
 
                 # Exclure header-includes pour éviter conflit
-                if [[ ! "$line" =~ ^header-includes: ]] && [[ ! "$line" =~ ^[[:space:]]*- ]]; then
+                if [[ "$line" =~ ^header-includes: ]]; then
+                    # On a trouvé header-includes, ignorer jusqu'à la prochaine section
+                    header_includes_section=true
+                    continue
+                elif [[ "$header_includes_section" == "true" ]]; then
+                    # Dans la section header-includes
+                    if [[ "$line" =~ ^[[:space:]]+.* ]]; then
+                        # Ligne indentée = contenu header-includes, ignorer
+                        continue
+                    else
+                        # Ligne non-indentée = fin de la section header-includes
+                        header_includes_section=false
+                        echo "$line"
+                    fi
+                else
+                    # Ligne normale, garder
                     echo "$line"
                 fi
             done < "formats/base.yaml"
@@ -112,34 +128,6 @@ create_merged_metadata() {
     log_debug "✅ Métadonnées créées: $output_file"
 }
 
-# === EXTRACTION CSS DU YAML ===
-extract_yaml_css() {
-    local yaml_file="$1"
-    local in_css=false
-    local css_content=""
-
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^css:[[:space:]]*\| ]]; then
-            in_css=true
-            continue
-        elif [[ "$in_css" == "true" ]]; then
-            if [[ "$line" =~ ^[[:space:]]{2} ]] || [[ -z "$line" ]]; then
-                # Ligne du CSS (indentée de 2 espaces) ou ligne vide
-                if [[ "$line" =~ ^[[:space:]]{2}(.*)$ ]]; then
-                    css_content="${css_content}${BASH_REMATCH[1]}"$'\n'
-                else
-                    css_content="${css_content}"$'\n'
-                fi
-            else
-                # Fin du bloc CSS (ligne non indentée)
-                break
-            fi
-        fi
-    done < "$yaml_file"
-
-    echo "$css_content"
-}
-
 # === GÉNÉRATION NOMS FICHIERS ===
 generate_output_filename() {
     local format="$1"
@@ -176,7 +164,7 @@ generate_output_filename() {
 # === DÉTECTION EXTENSION ===
 get_output_extension() {
     local output_type="$1"
-    
+
     case "$output_type" in
         "epub") echo "epub" ;;
         "html") echo "html" ;;
@@ -186,7 +174,6 @@ get_output_extension() {
 
 # === EXPORTS ===
 export -f create_merged_metadata
-export -f extract_yaml_css
 export -f generate_output_filename
 export -f get_output_extension
 

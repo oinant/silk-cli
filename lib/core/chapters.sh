@@ -146,8 +146,10 @@ collect_chapters_content() {
 
         # Stocker le chapitre consolidé
         if [[ -n "$combined_content" ]]; then
+            log_debug "   🎯 STOCKAGE: titre='$chapter_title' contenu='$(echo "$combined_content" | head -c 50 | tr '\n' ' ')...' parties='${#chapter_files[@]}'"
             # Format: "titre|contenu|nb_parties"
             chapters_content_ref["$chapter_num"]="$chapter_title|$combined_content|${#chapter_files[@]}"
+            log_debug "   🔍 VÉRIFICATION STOCKAGE: '$(echo "${chapters_content_ref[$chapter_num]}" | head -c 200 | tr '\n' ' ')...'"
             log_debug "   ✅ Ch$chapter_num: $chapter_title (${#chapter_files[@]} parties)"
         else
             log_debug "   ❌ Ch$chapter_num: aucun contenu manuscrit"
@@ -166,13 +168,14 @@ collect_chapters_content() {
 
 # === EXTRACTION TITRE/CONTENU/PARTIES DEPUIS DONNÉES CONSOLIDÉES ===
 get_chapter_title() {
-    local chapter_data="$1"
-    echo "$chapter_data" | cut -d'|' -f1
+    local data="$1"
+    echo "${data%%|*}"  # Tout avant le premier |
 }
 
 get_chapter_content() {
-    local chapter_data="$1"
-    echo "$chapter_data" | cut -d'|' -f2
+    local data="$1"
+    local temp="${data#*|}"  # Supprimer titre|
+    echo "${temp%|*}"        # Supprimer |nombre à la fin (s'il existe)
 }
 
 get_chapter_parts_count() {

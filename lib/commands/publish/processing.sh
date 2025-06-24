@@ -52,7 +52,8 @@ create_clean_chapter_file() {
 
     # Traitement du contenu ligne par ligne
     while IFS= read -r line; do
-        process_silk_line "$line" "$output_file" "$french_quotes" "$auto_dashes" "$output_type"
+        line_with_break="${line}  "
+        process_silk_line "$line_with_break" "$output_file" "$french_quotes" "$auto_dashes" "$output_type"
     done <<< "$content"
 
     log_debug "✅ Fichier nettoyé créé: $output_file"
@@ -160,24 +161,6 @@ process_silk_line() {
     fi
 }
 
-# === CONVERSION MARKDOWN BASIQUE VERS HTML ===
-process_markdown_to_html() {
-    local text="$1"
-
-    # Italique *texte* -> <em>texte</em> (mais pas **texte**)
-    text=$(echo "$text" | sed 's/\*\([^*]*\)\*/<em>\1<\/em>/g')
-
-    # Gras **texte** -> <strong>texte</strong>
-    text=$(echo "$text" | sed 's/\*\*\([^*]*\)\*\*/<strong>\1<\/strong>/g')
-
-    # Liens Obsidian [[liens|texte]] -> texte
-    text=$(echo "$text" | sed -e 's/\[\[\([^|]*\)|\([^]]*\)\]\]/\2/g')
-
-    # Liens Obsidian [[liens]] -> liens
-    text=$(echo "$text" | sed -e 's/\[\[\([^]]*\)\]\]/\1/g')
-
-    echo "$text"
-}
 
 # === PRÉPARATION CONTENU CHAPITRES ===
 prepare_chapter_content() {
@@ -186,9 +169,9 @@ prepare_chapter_content() {
     local auto_dashes="$3"
     local output_type="$4"
     local timestamp="$5"
-    
+
     local clean_files=()
-    
+
     # Collecte des chapitres avec fonctions core
     declare -A chapters_content
     if ! collect_chapters_content "$max_chapters" chapters_content; then
@@ -280,7 +263,6 @@ create_stats_page() {
 export -f extract_manuscript_content
 export -f create_clean_chapter_file
 export -f process_silk_line
-export -f process_markdown_to_html
 export -f prepare_chapter_content
 export -f create_stats_page
 
