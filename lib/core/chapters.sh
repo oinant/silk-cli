@@ -80,6 +80,18 @@ extract_chapter_number_from_filename() {
     fi
 }
 
+# === FONCTIONS D'ENCODAGE/DÉCODAGE POUR NEWLINES ===
+encode_newlines() {
+    local content="$1"
+    echo "$content" | base64 -w 0
+}
+
+decode_newlines() {
+    local encoded_content="$1"
+    # CORRECTION: Utiliser base64 standard (pas base64 -w 0)
+    echo "$encoded_content" | base64 -d 2>/dev/null
+}
+
 # === COLLECTE CHAPITRES AVEC CONSOLIDATION MULTI-PARTIES ===
 collect_chapters_content() {
     local chapter_spec="$1"
@@ -144,12 +156,17 @@ collect_chapters_content() {
             fi
         done
 
-        # Stocker le chapitre consolidé
+        # Stocker le chapitre consolidé avec contenu encodé
         if [[ -n "$combined_content" ]]; then
             log_debug "   🎯 STOCKAGE: titre='$chapter_title' contenu='$(echo "$combined_content" | head -c 50 | tr '\n' ' ')...' parties='${#chapter_files[@]}'"
-            # Format: "titre|contenu|nb_parties"
-            chapters_content_ref["$chapter_num"]="$chapter_title|$combined_content|${#chapter_files[@]}"
-            log_debug "   🔍 VÉRIFICATION STOCKAGE: '$(echo "${chapters_content_ref[$chapter_num]}" | head -c 200 | tr '\n' ' ')...'"
+
+            # CORRECTION: Encoder le contenu avant stockage pour éviter que les newlines cassent le format
+            local encoded_content=$(encode_newlines "$combined_content")
+
+            # Format: "titre|contenu_encodé|nb_parties"
+            chapters_content_ref["$chapter_num"]="$chapter_title|$encoded_content|${#chapter_files[@]}"
+
+            log_debug "   🔍 VÉRIFICATION STOCKAGE: contenu encodé ($(echo "$encoded_content" | wc -c) caractères)"
             log_debug "   ✅ Ch$chapter_num: $chapter_title (${#chapter_files[@]} parties)"
         else
             log_debug "   ❌ Ch$chapter_num: aucun contenu manuscrit"
@@ -160,8 +177,10 @@ collect_chapters_content() {
 
     log_debug "🔍 Debug contenu chapitres collectés:"
     for num in "${!chapters_content_ref[@]}"; do
-        local preview=$(echo "${chapters_content_ref[$num]}" | head -c 100 | tr '\n' ' ')
-        log_debug "   Ch$num: $preview..."
+        local chapter_data="${chapters_content_ref[$num]}"
+        local title=$(get_chapter_title "$chapter_data")
+        local parts=$(get_chapter_parts_count "$chapter_data")
+        log_debug "   Ch$num: '$title' ($parts parties)"
     done
     return 0
 }
@@ -174,13 +193,46 @@ get_chapter_title() {
 
 get_chapter_content() {
     local data="$1"
-    local temp="${data#*|}"  # Supprimer titre|
-    echo "${temp%|*}"        # Supprimer |nombre à la fin (s'il existe)
+
+    # Protection contre données vides
+    if [[ -z "$data" ]]; then
+        log_debug "get_chapter_content: données vides"
+        return 1
+    fi
+
+    # Extraction du contenu encodé (partie du milieu)
+    local temp="${data#*|}"      # Supprimer tout jusqu'au premier |
+    local encoded_content="${temp%|*}"   # Supprimer tout après le dernier |
+
+    log_debug "get_chapter_content: extraction contenu encodé (${#encoded_content} caractères)"
+
+    # CORRECTION CRITIQUE: Décoder le contenu base64 pour restaurer les newlines
+    local decoded_content
+    if decoded_content=$(echo "$encoded_content" | base64 -d 2>/dev/null); then
+        log_debug "get_chapter_content: décodage réussi (${#decoded_content} caractères décodés)"
+        echo "$decoded_content"
+    else
+        log_error "get_chapter_content: échec décodage base64 - contenu peut-être pas encodé"
+        # Fallback: retourner le contenu tel quel si pas encodé
+        echo "$encoded_content"
+    fi
 }
 
 get_chapter_parts_count() {
     local chapter_data="$1"
-    echo "$chapter_data" | cut -d'|' -f3
+
+    # CORRECTION: Maintenant que le contenu est encodé, cut fonctionne correctement
+    local parts_count=$(echo "$chapter_data" | cut -d'|' -f3)
+
+    log_debug "get_chapter_parts_count: extrait '$parts_count' depuis '$(echo "$chapter_data" | head -c 100)...'"
+
+    # Validation que c'est bien un nombre
+    if [[ -n "$parts_count" ]] && [[ "$parts_count" =~ ^[0-9]+$ ]]; then
+        echo "$parts_count"
+    else
+        log_debug "get_chapter_parts_count: '$parts_count' invalide, défaut à 1"
+        echo "1"
+    fi
 }
 
 # === FONCTION HELPER POUR AFFICHAGE ===
@@ -189,7 +241,15 @@ format_chapter_title_with_parts() {
     local title=$(get_chapter_title "$chapter_data")
     local parts_count=$(get_chapter_parts_count "$chapter_data")
 
-    if [[ "$parts_count" -gt 1 ]]; then
+    log_debug "format_chapter_title_with_parts: parts_count='$parts_count' title='$title'"
+
+    # Protection : s'assurer que parts_count est un nombre valide
+    if [[ -z "$parts_count" ]] || ! [[ "$parts_count" =~ ^[0-9]+$ ]]; then
+        log_debug "parts_count invalide, défaut à 1"
+        parts_count=1  # Valeur par défaut
+    fi
+
+    if (( parts_count > 1 )); then
         echo "$title ($parts_count parties)"
     else
         echo "$title"
@@ -212,6 +272,8 @@ is_chapter_in_requested_list() {
 # === EXPORTS ===
 export -f parse_chapter_range
 export -f extract_chapter_number_from_filename
+export -f encode_newlines
+export -f decode_newlines
 export -f collect_chapters_content
 export -f get_chapter_title
 export -f get_chapter_content
