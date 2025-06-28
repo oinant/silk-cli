@@ -197,18 +197,42 @@ add_embedded_css() {
     # CSS par défaut
     echo "  <style>"
     echo "    body { font-family: Georgia, serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 2rem; text-align: justify; }"
-    echo "    .chapter { margin-bottom: 3rem; }"
-    echo "    .chapter h2 { text-align: center; margin-bottom: 2rem; }"
+    echo "    .silk-manuscript { margin: 0; padding: 0; }"
+    echo "    header { text-align: center; margin-bottom: 3rem; border-bottom: 1px solid #eee; padding-bottom: 2rem; }"
+    echo "    .main-title { font-size: 2.5em; margin-bottom: 0.5rem; color: #333; }"
+    echo "    .author { font-size: 1.2em; color: #666; font-style: italic; }"
+    echo "    .chapter { margin-bottom: 3rem; border-bottom: 1px solid #f0f0f0; padding-bottom: 2rem; }"
+    echo "    .chapter:last-child { border-bottom: none; }"
+    echo "    .chapter h2 { text-align: center; margin-bottom: 2rem; font-size: 1.8em; color: #444; }"
     echo "    .narrative-section { margin-bottom: 2rem; }"
     echo "    /* Style livre : pas d'espacement entre paragraphes, indentation première ligne */"
-    echo "    p { margin: 0; text-indent: 1.5em; }"
+    echo "    p { margin: 0; text-indent: 1.5em; text-align: justify; }"
     echo "    /* Premier paragraphe d'une section : pas d'indentation */"
     echo "    .narrative-section > p:first-of-type, h2 + .narrative-section p:first-child, h3 + p { text-indent: 0; }"
-    echo "    /* Dialogues : pas d'indentation, en retrait */"
-    echo "    .dialogue { text-indent: 0 !important; margin-left: 1em; }"
-    echo "    .time-location { font-style: italic; text-align: center; margin: 1rem 0; text-indent: 0; }"
-    echo "    .blank-space { height: 2rem; text-align: center; }"
-    echo "    .blank-space::after { content: '⁂'; color: #666; }"
+    echo "    /* Classes sémantiques pour narration et dialogues */"
+    echo "    .narration { text-indent: 1.5em; }"
+    echo "    .dialogue { text-indent: 0 !important; margin-left: 1em; font-style: italic; }"
+    echo "    /* Indications temporelles/lieu - sans centrage */"
+    echo "    .time-location { font-style: italic; color: #666; margin: 1rem 0; text-indent: 0; }"
+    echo "    /* Blanc typographique */"
+    echo "    .blank-space { height: 2rem; text-align: center; margin: 1.5rem 0; }"
+    echo "    .blank-space::after { content: '⁂'; color: #666; font-size: 1.2em; }"
+    echo "    /* Styles pour les éléments en italique (pensées, titres, lectures) */"
+    echo "    em { font-style: italic; color: #555; }"
+    echo "    /* Table des matières */"
+    echo "    .table-of-contents { background: #f9f9f9; padding: 2rem; margin-bottom: 3rem; border-radius: 8px; }"
+    echo "    .table-of-contents h2 { margin-top: 0; text-align: center; }"
+    echo "    .table-of-contents ul { list-style: none; padding: 0; }"
+    echo "    .table-of-contents li { margin: 0.5rem 0; }"
+    echo "    .table-of-contents a { text-decoration: none; color: #333; }"
+    echo "    .table-of-contents a:hover { color: #666; }"
+    echo "    /* Responsive */"
+    echo "    @media (max-width: 768px) {"
+    echo "      body { padding: 1rem; font-size: 16px; }"
+    echo "      .main-title { font-size: 2em; }"
+    echo "      .chapter h2 { font-size: 1.5em; }"
+    echo "      p { text-indent: 1em; }"
+    echo "    }"
     echo "  </style>"
 }
 
@@ -377,15 +401,20 @@ process_content_line_to_html() {
         return 0
     fi
 
-    # Appliquer transformations typographiques
+    # Appliquer transformations typographiques et Markdown
     local processed_line="$line"
 
+    # 1. Traiter l'italique *texte* -> <em>texte</em>
+    processed_line=$(echo "$processed_line" | sed 's/\*\([^*]*\)\*/<em>\1<\/em>/g')
+
+    # 2. Guillemets français
     if [[ "$french_quotes" == "true" ]]; then
         # Remplacer guillemets droits par guillemets français
         processed_line="${processed_line//\"/« }"
         processed_line="${processed_line//\"/» }"
     fi
 
+    # 3. Tirets cadratins
     if [[ "$auto_dashes" == "true" ]]; then
         # Remplacer -- par — (tiret cadratin)
         processed_line="${processed_line//--/—}"
@@ -397,7 +426,7 @@ process_content_line_to_html() {
         echo "    <p class=\"dialogue\">$processed_line</p>"$'\n'
     else
         # Paragraphe narratif normal
-        echo "    <p>$processed_line</p>"$'\n'
+        echo "    <p class=\"narration\">$processed_line</p>"$'\n'
     fi
 
     return 0
