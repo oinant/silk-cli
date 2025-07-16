@@ -136,7 +136,7 @@ create_publishing_config() {
         "DATE" "$(date '+%Y-%m-%d')"
 
     # Copier autres formats (statiques)
-    local formats=("digital" "iphone" "kindle" "book")
+    local formats=("digital" "iphone" "kindle" "book" "html" "epub")
     for format in "${formats[@]}"; do
         local format_file="$SILK_LIB_DIR/templates/formats/${format}.yaml"
         if [[ -f "$format_file" ]]; then

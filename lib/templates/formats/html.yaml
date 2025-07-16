@@ -147,7 +147,6 @@ css: |
   .dialogue {
     text-indent: 0 !important;
     margin-left: 1rem;
-    font-style: italic;
     position: relative;
     padding-left: 1rem;
   }
@@ -361,10 +360,6 @@ css: |
     .blank-space::after {
       color: #666;
       text-shadow: 0 1px 2px rgba(255,255,255,0.1);
-    }
-
-    .dialogue::before {
-      color: #999;
     }
 
     em {
