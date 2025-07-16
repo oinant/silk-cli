@@ -155,7 +155,7 @@ start_html_document() {
             echo '<head>'
             echo "  <meta charset=\"UTF-8\">"
             echo "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-            echo "  <title>$project_name</title>"
+            echo "  <title>$TITLE - $AUTHOR_NAME</title>"
             add_embedded_css "$format"
             echo '</head>'
             echo '<body>'
@@ -169,8 +169,8 @@ start_html_document() {
         # En-tête pour document complet
         {
             echo '<header>'
-            echo "  <h1 class=\"main-title\">$project_name</h1>"
-            echo "  <p class=\"author\">${SILK_AUTHOR_NAME:-Auteur}</p>"
+            echo "  <h1 class=\"main-title\">$TITLE</h1>"
+            echo "  <p class=\"author\">${AUTHOR_NAME:-Auteur}</p>"
             echo '</header>'
         } >> "$output_file"
     fi

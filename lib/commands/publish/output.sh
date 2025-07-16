@@ -24,7 +24,7 @@ generate_silk_output() {
     # === TRAITEMENT HTML CUSTOM ===
     if [[ "$output_type" == "html" ]] && [[ "$(detect_custom_structure "$format")" == "true" ]]; then
         log_debug "🕸️ Génération HTML avec structure sémantique"
-        
+
         # Vérifier que la fonction est disponible
         if ! declare -f generate_custom_html > /dev/null; then
             log_error "Fonction generate_custom_html non disponible"
@@ -57,7 +57,7 @@ generate_silk_output() {
     # Préparer contenu des chapitres
     local clean_files_output
     clean_files_output=$(prepare_chapter_content "$max_chapters" "$french_quotes" "$auto_dashes" "$output_type" "$timestamp")
-    
+
     if [[ $? -ne 0 ]] || [[ -z "$clean_files_output" ]]; then
         log_error "Échec préparation contenu chapitres"
         return 1
@@ -70,7 +70,7 @@ generate_silk_output() {
     done <<< "$clean_files_output"
 
     local chapters_count=${#clean_files[@]}
-    
+
     # Ajouter page statistiques si demandée
     if [[ "$include_stats" == "true" ]]; then
         local stats_file="$PUBLISH_TEMP_DIR/silk_stats_${timestamp}.md"
@@ -109,11 +109,11 @@ execute_pandoc_generation() {
     local merged_metadata="$2"
     shift 2
     local clean_files=("$@")
-    
+
     # Récupérer les derniers arguments (passés dans l'ordre inverse)
     local include_toc="${clean_files[-1]}"
     local output_type="${clean_files[-2]}"
-    
+
     # Retirer les 2 derniers éléments de l'array
     unset 'clean_files[-1]'
     unset 'clean_files[-1]'
@@ -142,6 +142,9 @@ execute_pandoc_generation() {
         "epub")
             pandoc_args+=(
                 "--epub-chapter-level=2"
+                "--metadata" "title=$TITLE"
+                "--metadata" "author=$AUTHOR_NAME"
+                "--metadata" "lang=$LANGUAGE"
             )
             ;;
         "html")

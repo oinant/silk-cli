@@ -9,6 +9,13 @@ create_merged_metadata() {
     local include_toc="${4:-true}"
     local embeddable="${5:-false}"
 
+    # === DEBUG VARIABLES ===
+    log_debug "🔍 Variables disponibles dans create_merged_metadata:"
+    log_debug "   TITLE='${TITLE:-NON_DEFINI}'"
+    log_debug "   AUTHOR_NAME='${AUTHOR_NAME:-NON_DEFINI}'"
+    log_debug "   project_name='$project_name'"
+
+
     # Détecter le type de sortie
     local output_type=$(detect_output_format "$format")
 
@@ -44,8 +51,8 @@ create_merged_metadata() {
             local header_includes_section=false
             while IFS= read -r line; do
                 # Substitutions des variables
-                line=$(echo "$line" | sed "s/{{TITLE}}/$project_name/g")
-                line=$(echo "$line" | sed "s/{{AUTHOR}}/${SILK_AUTHOR_NAME:-Auteur}/g")
+                line=$(echo "$line" | sed "s/{{TITLE}}/$TITLE/g")
+                line=$(echo "$line" | sed "s/{{AUTHOR}}/${AUTHOR_NAME:-Auteur}/g")
                 line=$(echo "$line" | sed "s/{{DATE}}/$(date '+%Y-%m-%d')/g")
                 line=$(echo "$line" | sed "s|{{COVER_IMAGE}}|$cover_image|g")
 
@@ -71,8 +78,8 @@ create_merged_metadata() {
             done < "formats/base.yaml"
         else
             # Fallback sans base.yaml
-            echo "title: \"$project_name\""
-            echo "author: \"${SILK_AUTHOR_NAME:-Auteur}\""
+            echo "title: \"$TITLE\""
+            echo "author: \"${AUTHOR_NAME:-Auteur}\""
             echo "date: \"$(date '+%Y-%m-%d')\""
             echo "lang: fr-FR"
             if [[ -n "$cover_image" ]]; then
@@ -86,8 +93,8 @@ create_merged_metadata() {
         if [[ -f "formats/$format.yaml" ]]; then
             while IFS= read -r line; do
                 # Substitutions template standard
-                line=$(echo "$line" | sed "s/{{TITLE}}/$project_name/g")
-                line=$(echo "$line" | sed "s/{{AUTHOR}}/${SILK_AUTHOR_NAME:-Auteur}/g")
+                line=$(echo "$line" | sed "s/{{TITLE}}/$TITLE/g")
+                line=$(echo "$line" | sed "s/{{AUTHOR}}/${AUTHOR_NAME:-Auteur}/g")
                 line=$(echo "$line" | sed "s/{{DATE}}/$(date '+%Y-%m-%d')/g")
                 line=$(echo "$line" | sed "s|{{COVER_IMAGE}}|$cover_image|g")
 

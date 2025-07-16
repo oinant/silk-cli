@@ -25,6 +25,7 @@ load_publish_modules() {
         "commands/publish/output.sh"
         "commands/publish/cleanup.sh"
         "commands/publish/reporting.sh"
+        "commands/config.sh"
     )
 
     for module in "${required_modules[@]}"; do
@@ -48,7 +49,7 @@ cmd_publish() {
         return 1
     fi
 
-    local format="${SILK_DEFAULT_FORMAT:-digital}"
+    local format="${DEFAULT_FORMAT:-digital}"
     local max_chapters=99
     local output_name=""
     local french_quotes=false
@@ -57,6 +58,8 @@ cmd_publish() {
     local include_stats=false
     local dry_run=false
     local embeddable=false
+
+    silk_project_config_load
 
     # === PARSING DES ARGUMENTS ===
     while [[ $# -gt 0 ]]; do
@@ -133,7 +136,7 @@ cmd_publish() {
         return 1
     fi
 
-    if [[ "$dry_run" == "false" ]] && ! check_publish_dependencies "$format"; then
+    if [[ "$dry_run" == "false" ]] && ! validate_dependencies "$format"; then
         show_dependency_help
         return 1
     fi
@@ -147,6 +150,36 @@ cmd_publish() {
         generate_silk_output "$format" "$max_chapters" "$french_quotes" "$auto_dashes" "$output_name" "$include_toc" "$include_stats" "$embeddable"
     fi
 }
+
+
+validate_dependencies() {
+    log_header "Validation Dépendances"
+    echo "-----------------------"
+
+    # Dépendances obligatoires
+    local required_deps=("bash" "git")
+    for dep in "${required_deps[@]}"; do
+        if command -v "$dep" &> /dev/null; then
+            log_success "Dépendance: $dep"
+        else
+            log_fail "Dépendance manquante: $dep"
+        fi
+    done
+
+    # Dépendances optionnelles
+    local optional_deps=("pandoc" "xelatex")
+    for dep in "${optional_deps[@]}"; do
+        if command -v "$dep" &> /dev/null; then
+            log_success "Dépendance optionnelle: $dep"
+        else
+            log_warning "Dépendance optionnelle manquante: $dep"
+        fi
+    done
+
+    echo
+}
+
+
 
 # === AIDE PUBLISH ===
 show_publish_help() {
