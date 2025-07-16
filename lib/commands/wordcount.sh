@@ -21,7 +21,13 @@ readonly THRESHOLD_LABELS=("40k" "60k" "80k" "100k" "120k")
 cmd_wordcount() {
     ensure_silk_context
 
-    local target_words="${SILK_DEFAULT_TARGET_WORDS:-$DEFAULT_TARGET}"
+    local target_words="$DEFAULT_TARGET"
+    if [[ -f ".silk/config" ]]; then
+        source ".silk/config"
+        target_words="${TARGET_WORDS:-$DEFAULT_TARGET}"
+    fi
+
+
     local show_details=true
     local show_projections=true
     local output_format="table"
@@ -303,8 +309,8 @@ output_detailed_wordcount() {
     # Vérification séparateurs
     show_separator_validation "$files_without_separator"
 
-    # Analyse de régularité
-    show_regularity_analysis "$total_chapters" "$avg_words" chap_words
+    echo
+    echo "🕸️ SILK has analyzed your literary structure comprehensively."
 }
 
 # === ANALYSE PROJECTIONS ===
@@ -314,7 +320,7 @@ show_projections_analysis_silk() {
     local target_words="$3"
     local words_needed="$4"
     local avg_words="$5"
-    local -n chap_words=$6
+    local -n chapters_ref=$6
 
     if [[ $words_needed -gt 0 ]]; then
         local words_per_chapter=$((words_needed / total_chapters))
@@ -348,8 +354,8 @@ show_projections_analysis_silk() {
         # Chapitres à développer en priorité
         echo
         echo "🎯 CHAPITRES À DÉVELOPPER EN PRIORITÉ (< moyenne actuelle)"
-        for chapter_num in $(printf '%s\n' "${!chap_words[@]}" | sort -n); do
-            local word_count=${chap_words[$chapter_num]}
+        for chapter_num in $(printf '%s\n' "${!chapters_ref[@]}" | sort -n); do
+            local word_count=${chapters_ref[$chapter_num]}
             if [[ "$word_count" -lt "$avg_words" ]] && [[ "$word_count" -gt 0 ]]; then
                 local gap=$((avg_words - word_count))
                 local target_gap=$((target_avg - word_count))
@@ -426,49 +432,6 @@ show_separator_validation() {
     fi
 }
 
-# === ANALYSE RÉGULARITÉ ===
-show_regularity_analysis() {
-    local total_chapters="$1"
-    local avg_words="$2"
-    local -n chap_words=$3
-
-    echo
-    echo "📊 SILK ANALYSE - RÉGULARITÉ CHAPITRES"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-    # Calculer écart type approximatif
-    local variance=0
-    for chapter_num in "${!chap_words[@]}"; do
-        local word_count=${chap_words[$chapter_num]}
-        local diff=$((word_count - avg_words))
-        variance=$((variance + (diff * diff)))
-    done
-    variance=$((variance / total_chapters))
-
-    # Écart-type approximatif (racine carrée approchée)
-    local std_dev=$(echo "sqrt($variance)" | bc -l 2>/dev/null | cut -d. -f1 || echo "N/A")
-
-    if [[ "$std_dev" != "N/A" ]]; then
-        echo "Écart-type des longueurs      : ~$std_dev mots"
-        local regularity_percentage=$((100 - (std_dev * 100 / avg_words)))
-
-        if [[ $std_dev -lt 500 ]]; then
-            echo "✅ Chapitres très réguliers (régularité: ${regularity_percentage}%)"
-            echo "🕸️ Structure SILK harmonieuse pour l'expérience lecteur"
-        elif [[ $std_dev -lt 1000 ]]; then
-            echo "🟡 Chapitres moyennement réguliers (régularité: ${regularity_percentage}%)"
-            echo "💡 Quelques ajustements pourraient améliorer le rythme"
-        else
-            echo "🔥 Chapitres très irréguliers (régularité: ${regularity_percentage}%)"
-            echo "🎯 Harmonisation recommandée pour un rythme équilibré"
-        fi
-    else
-        echo "Régularité non calculable (bc non disponible)"
-    fi
-
-    echo
-    echo "🕸️ SILK has analyzed your literary structure comprehensively."
-}
 
 # === FONCTIONS UTILITAIRES ===
 get_base_chapter_number() {
