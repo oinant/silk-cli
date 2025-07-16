@@ -98,7 +98,7 @@ load_module() {
 load_core_modules() {
     local required_modules=(
         "utils.sh"
-        "config.sh"
+        #"config.sh"
         "vault.sh"
         "templates.sh"
         "chapters.sh"
@@ -155,7 +155,7 @@ check_silk_environment() {
     fi
 
     # Vérifier modules core essentiels
-    local core_modules=("utils.sh" "config.sh" "vault.sh")
+    local core_modules=("utils.sh" "vault.sh")
     for module in "${core_modules[@]}"; do
         if [[ ! -f "$SILK_LIB_DIR/core/$module" ]]; then
             log_error "Module core manquant: $SILK_LIB_DIR/core/$module"
@@ -165,36 +165,6 @@ check_silk_environment() {
 
     log_debug "Environnement SILK valide"
     return 0
-}
-
-# === GESTION CONFIGURATION (Version simplifiée pour bootstrap) ===
-load_config() {
-    mkdir -p "$SILK_HOME"
-    if [[ -f "$SILK_CONFIG" ]]; then
-        source "$SILK_CONFIG"
-    fi
-
-    # Valeurs par défaut
-    SILK_DEFAULT_GENRE="${SILK_DEFAULT_GENRE:-polar-psychologique}"
-    SILK_DEFAULT_LANGUAGE="${SILK_DEFAULT_LANGUAGE:-fr}"
-    SILK_DEFAULT_TARGET_WORDS="${SILK_DEFAULT_TARGET_WORDS:-80000}"
-    SILK_DEFAULT_CHAPTERS="${SILK_DEFAULT_CHAPTERS:-30}"
-    SILK_DEFAULT_FORMAT="${SILK_DEFAULT_FORMAT:-digital}"
-    SILK_AUTHOR_NAME="${SILK_AUTHOR_NAME:-}"
-    SILK_AUTHOR_PSEUDO="${SILK_AUTHOR_PSEUDO:-}"
-}
-
-save_config() {
-    cat > "$SILK_CONFIG" << EOF
-# SILK Configuration - Smart Integrated Literary Kit
-SILK_DEFAULT_GENRE="${SILK_DEFAULT_GENRE:-polar-psychologique}"
-SILK_DEFAULT_LANGUAGE="${SILK_DEFAULT_LANGUAGE:-fr}"
-SILK_DEFAULT_TARGET_WORDS="${SILK_DEFAULT_TARGET_WORDS:-80000}"
-SILK_DEFAULT_CHAPTERS="${SILK_DEFAULT_CHAPTERS:-30}"
-SILK_DEFAULT_FORMAT="${SILK_DEFAULT_FORMAT:-digital}"
-SILK_AUTHOR_NAME="${SILK_AUTHOR_NAME:-}"
-SILK_AUTHOR_PSEUDO="${SILK_AUTHOR_PSEUDO:-}"
-EOF
 }
 
 # === COMMANDES INTÉGRÉES (pour compatibilité) ===
@@ -209,89 +179,6 @@ cmd_version() {
     return 0
 }
 
-cmd_config() {
-    load_config
-
-    case "${1:-list}" in
-        --list|list)
-            echo "🕷️ SILK Configuration"
-            echo "==================="
-            echo "Genre par défaut        : ${SILK_DEFAULT_GENRE}"
-            echo "Langue par défaut       : ${SILK_DEFAULT_LANGUAGE}"
-            echo "Objectif mots défaut    : ${SILK_DEFAULT_TARGET_WORDS}"
-            echo "Chapitres par défaut    : ${SILK_DEFAULT_CHAPTERS}"
-            echo "Format par défaut       : ${SILK_DEFAULT_FORMAT}"
-            echo "Nom auteur              : ${SILK_AUTHOR_NAME:-non défini}"
-            echo "Pseudonyme auteur       : ${SILK_AUTHOR_PSEUDO:-non défini}"
-            echo ""
-            echo "📁 Fichier config       : $SILK_CONFIG"
-            echo "📚 Modules SILK          : $SILK_LIB_DIR"
-            ;;
-        --set)
-            if [[ $# -lt 2 ]] || [[ "$2" != *"="* ]]; then
-                log_error "Format: silk config --set KEY=VALUE"
-                return 1
-            fi
-            local key="${2%%=*}"
-            local value="${2#*=}"
-
-            case "$key" in
-                SILK_AUTHOR_NAME) SILK_AUTHOR_NAME="$value" ;;
-                SILK_DEFAULT_GENRE) SILK_DEFAULT_GENRE="$value" ;;
-                SILK_DEFAULT_TARGET_WORDS) SILK_DEFAULT_TARGET_WORDS="$value" ;;
-                *) log_error "Clé inconnue: $key"; return 1 ;;
-            esac
-
-            save_config
-            log_success "Configuration mise à jour: $key=$value"
-            ;;
-        --get)
-            if [[ $# -lt 2 ]]; then
-                log_error "Format: silk config --get KEY"
-                return 1
-            fi
-            case "$2" in
-                SILK_AUTHOR_NAME) echo "$SILK_AUTHOR_NAME" ;;
-                SILK_DEFAULT_GENRE) echo "$SILK_DEFAULT_GENRE" ;;
-                SILK_DEFAULT_TARGET_WORDS) echo "$SILK_DEFAULT_TARGET_WORDS" ;;
-                *) log_error "Clé inconnue: $2"; return 1 ;;
-            esac
-            ;;
-        --help|-h)
-            show_config_help
-            ;;
-        *)
-            log_error "Option inconnue: $1"
-            show_config_help
-            return 1
-            ;;
-    esac
-}
-
-show_config_help() {
-    cat << 'HELP'
-⚙️ SILK CONFIG - Configuration globale
-
-USAGE:
-  silk config [OPTIONS]
-
-OPTIONS:
-  --list                    Afficher configuration (défaut)
-  --set KEY=VALUE          Définir une configuration
-  --get KEY                Afficher une configuration
-  -h, --help               Afficher cette aide
-
-EXEMPLES:
-  silk config --list
-  silk config --set SILK_AUTHOR_NAME="Jane Doe"
-  silk config --get SILK_DEFAULT_GENRE
-
-CLÉS DISPONIBLES:
-  SILK_AUTHOR_NAME         Nom de l'auteur
-  SILK_DEFAULT_GENRE       Genre par défaut
-  SILK_DEFAULT_TARGET_WORDS Objectif mots par défaut
-HELP
-}
 
 # === COMMANDES MODULAIRES ===
 execute_modular_command() {
@@ -307,10 +194,10 @@ execute_modular_command() {
         echo ""
         echo "💡 Commandes disponibles:"
         echo "   version    - Afficher version SILK"
-        echo "   config     - Configuration globale"
         echo ""
         echo "🚧 Commandes en développement:"
         echo "   init       - Créer nouveau projet"
+        echo "   config     - Configuration globale"
         echo "   context    - Générer contexte LLM"
         echo "   wordcount  - Statistiques progression"
         echo "   publish    - Générer PDF"
@@ -341,7 +228,6 @@ show_help() {
     echo
     echo "COMMANDES DISPONIBLES:"
     echo "  version     Afficher version et informations système"
-    echo "  config      Configuration globale SILK"
     echo
     echo "COMMANDES MODULAIRES:"
 
@@ -357,11 +243,11 @@ show_help() {
     if [[ ${#available_commands[@]} -gt 0 ]]; then
         for cmd in "${available_commands[@]}"; do
             case "$cmd" in
-                init) echo "  init        Créer un nouveau projet d'écriture" ;;
-                context) echo "  context     Générer contexte pour LLM (Claude, GPT, etc.)" ;;
+                init) echo      "  init        Créer un nouveau projet d'écriture" ;;
+                context) echo   "  context     Générer contexte pour LLM (Claude, GPT, etc.)" ;;
                 wordcount) echo "  wordcount   Statistiques progression manuscrit" ;;
-                publish) echo "  publish     Générer PDF du manuscrit" ;;
-                *) echo "  $cmd        Module de commande disponible" ;;
+                publish) echo   "  publish     Générer PDF du manuscrit" ;;
+                *) echo         "  $cmd        Module de commande disponible" ;;
             esac
         done
     else
@@ -441,9 +327,6 @@ main() {
         exit 1
     fi
 
-    # Charger configuration
-    load_config
-
     # Charger modules core
     if ! load_core_modules; then
         log_warning "Modules core non disponibles, fonctionnalité limitée"
@@ -465,16 +348,13 @@ main() {
         version)
             cmd_version
             ;;
-        config)
-            cmd_config "$@"
-            ;;
-        init|context|wordcount|publish)
+        config|init|context|wordcount|publish)
             execute_modular_command "$command" "$@"
             ;;
         *)
             log_error "Commande inconnue: $command"
             echo ""
-            echo "💡 Commandes disponibles: version, config"
+            echo "💡 Commandes disponibles: version"
             echo "   Utilisez 'silk --help' pour plus d'informations"
             exit 1
             ;;
@@ -482,7 +362,7 @@ main() {
 }
 
 # === EXPORT VARIABLES GLOBALES ===
-export SILK_VERSION SILK_HOME SILK_CONFIG SILK_LIB_DIR VAULT_MARKER
+export SILK_VERSION SILK_HOME SILK_LIB_DIR VAULT_MARKER
 export -f log_info log_success log_warning log_error log_header log_debug
 export -f load_module detect_os
 

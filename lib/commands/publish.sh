@@ -183,8 +183,7 @@ FORMATS SILK DISPONIBLES:
   kindle     Format liseuse (5"×7.5", optimisé e-ink) - Kindle/Kobo
   book       Format livre papier (A5, marges optimisées) - impression
   epub       Format EPUB mobile (reflowable, sans LaTeX requis)
-  html       Format HTML brut
-  html-custom  Format HTML avec structure sémantique (sections/articles)
+  html       Format HTML avec structure sémantique (sections/articles)
 
 CONVENTIONS MANUSCRIT SILK:
   ~          → Blanc typographique (pause narrative)
