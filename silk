@@ -103,6 +103,7 @@ load_core_modules() {
         "templates.sh"
         "chapters.sh"
         "custom_html.sh"
+        "cache-utils.sh"
     )
 
     log_debug "Chargement modules core..."
@@ -194,13 +195,12 @@ execute_modular_command() {
         echo ""
         echo "💡 Commandes disponibles:"
         echo "   version    - Afficher version SILK"
-        echo ""
-        echo "🚧 Commandes en développement:"
         echo "   init       - Créer nouveau projet"
         echo "   config     - Configuration globale"
         echo "   context    - Générer contexte LLM"
         echo "   wordcount  - Statistiques progression"
         echo "   publish    - Générer PDF"
+        echo "   cache      - Gérer le cache Silk"
         return 1
     fi
 
@@ -348,7 +348,7 @@ main() {
         version)
             cmd_version
             ;;
-        config|init|context|wordcount|publish)
+        cache|init|context|wordcount|publish)
             execute_modular_command "$command" "$@"
             ;;
         *)

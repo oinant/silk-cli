@@ -18,6 +18,7 @@ SILK_CONFIG_KEYS=(
     "DEFAULT_FORMAT"
     "AUTHOR_NAME"
     "AUTHOR_PSEUDO"
+    "COVER"
 )
 
 # === FONCTIONS CONFIGURATION ===
@@ -31,6 +32,7 @@ silk_project_config_load() {
     DEFAULT_FORMAT="digital"
     AUTHOR_NAME=""
     AUTHOR_PSEUDO=""
+    COVER=""
 
     # Charger depuis fichier si existe
     if [[ -f "$SILK_CONFIG_FILE" ]]; then
@@ -59,6 +61,7 @@ TARGET_CHAPTERS="$TARGET_CHAPTERS"
 DEFAULT_FORMAT="$DEFAULT_FORMAT"
 AUTHOR_NAME="$AUTHOR_NAME"
 AUTHOR_PSEUDO="$AUTHOR_PSEUDO"
+COVER="$COVER"
 EOF
 
     log_debug "Configuration projet sauvegardée: $SILK_CONFIG_FILE"
@@ -132,6 +135,9 @@ silk_project_config_set() {
         AUTHOR_PSEUDO)
             AUTHOR_PSEUDO="$value"
             ;;
+        COVER)
+            COVER="$value"
+            ;;
     esac
 
     # Sauvegarder
@@ -154,6 +160,7 @@ silk_project_config_get() {
         DEFAULT_FORMAT) echo "$DEFAULT_FORMAT" ;;
         AUTHOR_NAME) echo "$AUTHOR_NAME" ;;
         AUTHOR_PSEUDO) echo "$AUTHOR_PSEUDO" ;;
+        COVER) echo "$COVER" ;;
         *)
             log_error "Clé inconnue: $key"
             return 1
@@ -175,6 +182,7 @@ silk_project_config_list() {
     echo "Format par défaut       : ${DEFAULT_FORMAT}"
     echo "Nom auteur              : ${AUTHOR_NAME:-non défini}"
     echo "Pseudonyme auteur       : ${AUTHOR_PSEUDO:-non défini}"
+    echo "Image de couverture     : ${COVER:-non définie}"
     echo ""
     echo "📁 Fichier config       : $SILK_CONFIG_FILE"
 
@@ -279,6 +287,7 @@ CLÉS DISPONIBLES:
   DEFAULT_FORMAT            Format publication (défaut: digital)
   AUTHOR_NAME               Nom auteur
   AUTHOR_PSEUDO             Pseudonyme auteur
+  COVER                     Cover image path
 
 EXEMPLES:
   silk config --init

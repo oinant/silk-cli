@@ -129,7 +129,6 @@ create_merged_metadata() {
             done < "formats/$format.yaml"
         fi
 
-        echo "---"
     } > "$output_file"
 
     log_debug "✅ Métadonnées créées: $output_file"

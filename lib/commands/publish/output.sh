@@ -48,7 +48,7 @@ generate_silk_output() {
     log_info "Préparation métadonnées de publication..."
 
     # Créer métadonnées fusionnées
-    local merged_metadata="$PUBLISH_TEMP_DIR/silk_merged_${format}_${timestamp}.yaml"
+    local merged_metadata="$PUBLISH_TEMP_DIR/silk_merged_${format}.yaml"
     create_merged_metadata "$format" "$merged_metadata" "$project_name" "$include_toc" "$embeddable"
     log_debug "Métadonnées créées: $merged_metadata"
 
@@ -56,7 +56,7 @@ generate_silk_output() {
 
     # Préparer contenu des chapitres
     local clean_files_output
-    clean_files_output=$(prepare_chapter_content "$max_chapters" "$french_quotes" "$auto_dashes" "$output_type" "$timestamp")
+    clean_files_output=$(prepare_chapter_content "$max_chapters" "$french_quotes" "$auto_dashes" "$output_type")
 
     if [[ $? -ne 0 ]] || [[ -z "$clean_files_output" ]]; then
         log_error "Échec préparation contenu chapitres"
@@ -141,10 +141,13 @@ execute_pandoc_generation() {
             ;;
         "epub")
             pandoc_args+=(
-                "--epub-chapter-level=2"
+                "--split-level=2"
                 "--metadata" "title=$TITLE"
                 "--metadata" "author=$AUTHOR_NAME"
                 "--metadata" "lang=$LANGUAGE"
+                #"--epub-cover-image=$COVER"
+                #"--css=epub.css"
+                "--verbose"
             )
             ;;
         "html")
@@ -160,6 +163,7 @@ execute_pandoc_generation() {
         pandoc_args+=("--toc" "--toc-depth=1")
     fi
 
+    log_debug "Répertoire courant: $(pwd)"
     log_debug "Commande Pandoc: pandoc ${pandoc_args[*]}"
 
     # Exécution Pandoc avec gestion d'erreur

@@ -168,9 +168,11 @@ prepare_chapter_content() {
     local french_quotes="$2"
     local auto_dashes="$3"
     local output_type="$4"
-    local timestamp="$5"
 
     local clean_files=()
+
+    # Initialiser le cache
+    cache_init
 
     # Collecte des chapitres avec fonctions core
     declare -A chapters_content
@@ -197,12 +199,24 @@ prepare_chapter_content() {
         # Titre avec indication des parties multiples
         local display_title=$(format_chapter_title_with_parts "$chapter_data")
 
-        # Créer fichier nettoyé
-        local clean_file="$PUBLISH_TEMP_DIR/silk_clean_ch${chapter_num}_${timestamp}.md"
+        # Nom pour cache (sans caractères spéciaux)
+        local clean_filename="clean_Ch${chapter_num}.md"
+        local clean_file="$PUBLISH_TEMP_DIR/$clean_filename"
 
-        if create_clean_chapter_file "$clean_file" "$chapter_num" "$display_title" "$chapter_content" "$french_quotes" "$auto_dashes" "$output_type"; then
-            clean_files+=("$clean_file")
-            log_debug "   ✅ Ch$chapter_num préparé: $display_title"
+        # Vérifier cache d'abord (système chapitre multi-parties)
+        if is_chapter_cached_and_valid "$chapter_num"; then
+            local cached_path
+            cached_path=$(get_cached_chapter_clean_path "$chapter_num")
+            clean_files+=("$cached_path")
+            log_debug "   🚀 Ch$chapter_num réutilisé (cache): $display_title"
+        else
+            # Créer nouveau fichier clean
+            if create_clean_chapter_file "$clean_file" "$chapter_num" "$display_title" "$chapter_content" "$french_quotes" "$auto_dashes" "$output_type"; then
+                # Mettre à jour cache (système chapitre)
+                cache_update_chapter "$chapter_num" "$clean_filename"
+                clean_files+=("$clean_file")
+                log_debug "   ✅ Ch$chapter_num créé: $display_title"
+            fi
         fi
     done
 
