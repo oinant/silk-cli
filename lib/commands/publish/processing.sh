@@ -200,7 +200,7 @@ prepare_chapter_content() {
         local display_title=$(format_chapter_title_with_parts "$chapter_data")
 
         # Nom pour cache (sans caractères spéciaux)
-        local clean_filename="clean_Ch${chapter_num}.md"
+        local clean_filename="clean_Ch$(printf "%02d" "$chapter_num").md"
         local clean_file="$PUBLISH_TEMP_DIR/$clean_filename"
 
         # Vérifier cache d'abord (système chapitre multi-parties)

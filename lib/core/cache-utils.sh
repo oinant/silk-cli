@@ -7,6 +7,11 @@ if [[ "${SILK_CORE_UTILS_LOADED:-false}" != "true" ]]; then
     exit 1
 fi
 
+if [[ "${SILK_CORE_CHAPTERS_LOADED:-false}" != "true" ]]; then
+    echo "❌ Module core/chapters requis" >&2
+    exit 1
+fi
+
 # === CONSTANTES CACHE ===
 readonly SILK_CACHE_DIR=".silk"
 readonly SILK_CACHE_FILE="$SILK_CACHE_DIR/cleanedfilescache.csv"
@@ -63,9 +68,12 @@ get_chapter_source_files() {
     local chapter_files=()
 
     # Collecter tous les fichiers sources pour ce chapitre
-    for file in 01-Manuscrit/Ch${chapter_num}*.md; do
+    for file in 01-Manuscrit/Ch*.md; do
         if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
-            chapter_files+=("$file")
+            local file_chapter_num=$(extract_chapter_number_from_filename "$file")
+            if [[ "$file_chapter_num" == "$chapter_num" ]]; then
+                chapter_files+=("$file")
+            fi
         fi
     done
 
@@ -270,21 +278,59 @@ get_cached_chapter_clean_path() {
 cache_cleanup() {
     local force="${1:-false}"
 
-    if [[ "$force" == "true" ]]; then
-        # Suppression complète
+    # CORRECTION: Désactiver le mode strict pour éviter les crashes
+    set +e
+
+    if [[ "$force" == "true" ]] || [[ "$1" == "--force" ]]; then
+        log_debug "Mode suppression complète activé"
+
+        # Suppression complète du fichier cache
         if [[ -f "$SILK_CACHE_FILE" ]]; then
-            rm -f "$SILK_CACHE_FILE"
-            log_info "Cache vidé complètement"
+            rm -f "$SILK_CACHE_FILE" 2>/dev/null
+            if [[ $? -eq 0 ]]; then
+                log_info "Fichier cache supprimé: $SILK_CACHE_FILE"
+            else
+                log_error "Échec suppression fichier cache"
+            fi
+        else
+            log_debug "Fichier cache déjà absent"
         fi
 
-        # Supprimer tous les fichiers clean
+        # Supprimer tous les fichiers clean en masse
         if [[ -d "$SILK_CLEAN_FILES_DIR" ]]; then
-            find "$SILK_CLEAN_FILES_DIR" -name "clean_Ch*.md" -delete 2>/dev/null || true
-            log_info "Fichiers clean supprimés"
+            local deleted_count=0
+
+            # Méthode robuste : compter d'abord
+            local clean_files_found=$(find "$SILK_CLEAN_FILES_DIR" -name "clean_Ch*.md" -type f 2>/dev/null | wc -l)
+
+            if [[ $clean_files_found -gt 0 ]]; then
+                # Supprimer avec find (plus fiable que rm avec patterns)
+                find "$SILK_CLEAN_FILES_DIR" -name "clean_Ch*.md" -type f -delete 2>/dev/null
+
+                # Vérifier combien reste
+                local remaining_files=$(find "$SILK_CLEAN_FILES_DIR" -name "clean_Ch*.md" -type f 2>/dev/null | wc -l)
+                deleted_count=$((clean_files_found - remaining_files))
+
+                if [[ $deleted_count -gt 0 ]]; then
+                    log_info "Fichiers clean supprimés: $deleted_count"
+                else
+                    log_warning "Aucun fichier clean supprimé (problème de permissions ?)"
+                fi
+            else
+                log_debug "Aucun fichier clean à supprimer"
+            fi
+        else
+            log_debug "Répertoire clean files absent: $SILK_CLEAN_FILES_DIR"
         fi
+
+        # Réinitialiser le cache après suppression complète
+        cache_init
+
     else
         # Nettoyage intelligent : supprimer entrées avec chapitres manquants
         if [[ ! -f "$SILK_CACHE_FILE" ]]; then
+            log_debug "Fichier cache absent, rien à nettoyer"
+            set -e  # Réactiver le mode strict
             return 0
         fi
 
@@ -292,7 +338,10 @@ cache_cleanup() {
         local cleaned=0
 
         # Copier en-tête
-        grep "^#" "$SILK_CACHE_FILE" > "$temp_file"
+        grep "^#" "$SILK_CACHE_FILE" > "$temp_file" 2>/dev/null || {
+            echo "# SILK Cache - Chapitres multi-parties" > "$temp_file"
+            echo "# format: chapter_key,composite_hash,clean_file" >> "$temp_file"
+        }
 
         # Vérifier chaque entrée
         while IFS=',' read -r chapter_key composite_hash clean_file; do
@@ -309,30 +358,51 @@ cache_cleanup() {
                 # Format non reconnu, supprimer
                 local clean_path="$SILK_CLEAN_FILES_DIR/$clean_file"
                 if [[ -f "$clean_path" ]]; then
-                    rm -f "$clean_path"
+                    rm -f "$clean_path" 2>/dev/null
                 fi
                 ((cleaned++))
                 log_debug "Supprimé du cache: $chapter_key (format non reconnu)"
                 continue
             fi
 
-            # Vérifier si au moins un fichier source existe pour ce chapitre
-            if get_chapter_source_files "$chapter_num" >/dev/null 2>&1; then
+            # CORRECTION: Utiliser la logique corrigée pour vérifier l'existence des fichiers
+            local chapter_files_found=false
+
+            # Pattern corrigé : chercher Ch01, Ch02, etc.
+            local padded_num=$(printf "%02d" "$chapter_num")
+            for file in 01-Manuscrit/Ch${padded_num}*.md; do
+                if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                    chapter_files_found=true
+                    break
+                fi
+            done
+
+            # Si pas trouvé avec zéros, essayer sans zéros
+            if [[ "$chapter_files_found" == "false" ]]; then
+                for file in 01-Manuscrit/Ch${chapter_num}-*.md; do
+                    if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                        chapter_files_found=true
+                        break
+                    fi
+                done
+            fi
+
+            if [[ "$chapter_files_found" == "true" ]]; then
                 # Garder l'entrée
                 echo "${chapter_key},${composite_hash},${clean_file}" >> "$temp_file"
             else
                 # Supprimer fichier clean associé s'il existe
                 local clean_path="$SILK_CLEAN_FILES_DIR/$clean_file"
                 if [[ -f "$clean_path" ]]; then
-                    rm -f "$clean_path"
+                    rm -f "$clean_path" 2>/dev/null
                 fi
                 ((cleaned++))
                 log_debug "Supprimé du cache: $chapter_key (fichiers source manquants)"
             fi
-        done < <(grep -v "^#" "$SILK_CACHE_FILE")
+        done < <(grep -v "^#" "$SILK_CACHE_FILE" 2>/dev/null)
 
         # Remplacer fichier
-        mv "$temp_file" "$SILK_CACHE_FILE"
+        mv "$temp_file" "$SILK_CACHE_FILE" 2>/dev/null
 
         if [[ $cleaned -gt 0 ]]; then
             log_info "Cache nettoyé: $cleaned entrées supprimées"
@@ -340,6 +410,9 @@ cache_cleanup() {
             log_debug "Cache déjà propre"
         fi
     fi
+
+    # Réactiver le mode strict
+    set -e
 }
 
 # === STATISTIQUES CACHE ===
@@ -349,10 +422,13 @@ cache_stats() {
         return
     fi
 
-    local total_entries=$(grep -v "^#" "$SILK_CACHE_FILE" | grep -c "^[^,]*,")
+    local total_entries=$(grep -v "^#" "$SILK_CACHE_FILE" | grep -c "^[^,]*," 2>/dev/null || echo "0")
     local valid_entries=0
     local invalid_entries=0
     local multi_part_chapters=0
+
+    # CORRECTION: Désactiver le mode strict pour éviter que les erreurs cassent la boucle
+    set +e
 
     while IFS=',' read -r chapter_key composite_hash clean_file; do
         if [[ "$chapter_key" =~ ^#.*$ ]] || [[ -z "$chapter_key" ]]; then
@@ -364,28 +440,35 @@ cache_stats() {
         if [[ "$chapter_key" =~ ^Ch([0-9]+)$ ]]; then
             chapter_num="${BASH_REMATCH[1]}"
 
-            # Compter fichiers sources pour ce chapitre
+            # Compter fichiers sources pour ce chapitre - PROTECTION contre erreurs
             local chapter_files_output
-            chapter_files_output=$(get_chapter_source_files "$chapter_num")
-            if [[ $? -eq 0 ]]; then
+            chapter_files_output=$(get_chapter_source_files "$chapter_num" 2>/dev/null)
+            local get_files_exit_code=$?
+
+            if [[ $get_files_exit_code -eq 0 ]] && [[ -n "$chapter_files_output" ]]; then
                 local files_count=$(echo "$chapter_files_output" | wc -l)
                 if [[ $files_count -gt 1 ]]; then
                     ((multi_part_chapters++))
                 fi
 
-                if is_chapter_cached_and_valid "$chapter_num"; then
+                # Vérifier validité cache - PROTECTION contre erreurs
+                if is_chapter_cached_and_valid "$chapter_num" 2>/dev/null; then
                     ((valid_entries++))
                 else
                     ((invalid_entries++))
                 fi
             else
+                # Fichiers sources manquants/introuvables
                 ((invalid_entries++))
             fi
         else
             # Format non reconnu, compter comme invalide
             ((invalid_entries++))
         fi
-    done < <(grep -v "^#" "$SILK_CACHE_FILE")
+    done < <(grep -v "^#" "$SILK_CACHE_FILE" 2>/dev/null)
+
+    # Réactiver le mode strict
+    set -e
 
     echo "📊 Statistiques cache SILK:"
     echo "   Total entrées: $total_entries"
@@ -394,7 +477,7 @@ cache_stats() {
     echo "   Chapitres multi-parties: $multi_part_chapters"
 
     if [[ -d "$SILK_CLEAN_FILES_DIR" ]]; then
-        local clean_files_count=$(find "$SILK_CLEAN_FILES_DIR" -name "clean_Ch*.md" | wc -l)
+        local clean_files_count=$(find "$SILK_CLEAN_FILES_DIR" -name "clean_Ch*.md" 2>/dev/null | wc -l || echo "0")
         echo "   Fichiers clean: $clean_files_count"
     fi
 }

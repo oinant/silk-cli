@@ -106,6 +106,11 @@ cache_command_list() {
 
     # Lire et afficher chaque entrée
     local entries_count=0
+
+    # SOLUTION: Désactiver temporairement le mode strict pour éviter que les erreurs
+    # dans les fonctions appelées cassent la boucle
+    set +e
+
     while IFS=',' read -r chapter_key composite_hash clean_file; do
         # Ignorer commentaires et lignes vides
         if [[ "$chapter_key" =~ ^#.*$ ]] || [[ -z "$chapter_key" ]]; then
@@ -122,13 +127,15 @@ cache_command_list() {
             chapter_num="$chapter_key"
         fi
 
-        # Vérifier statut
+        # Vérifier statut - PROTECTION contre les erreurs
         local status="❓"
         local status_text="Inconnu"
 
         if [[ "$chapter_key" =~ ^Ch([0-9]+)$ ]]; then
             local ch_num="${BASH_REMATCH[1]}"
-            if is_chapter_cached_and_valid "$ch_num"; then
+
+            # CORRECTION: Capturer le résultat sans laisser les erreurs casser la boucle
+            if is_chapter_cached_and_valid "$ch_num" 2>/dev/null; then
                 status="✅"
                 status_text="Valide"
             else
@@ -148,7 +155,10 @@ cache_command_list() {
             printf "%-8s %-15s %s\n" "$chapter_key" "$status_text" "$clean_file"
         fi
 
-    done < <(grep -v "^#" "$SILK_CACHE_FILE" 2>/dev/null || true)
+    done < <(grep -v "^#" "$SILK_CACHE_FILE" 2>/dev/null)
+
+    # Réactiver le mode strict
+    set -e
 
     if [[ $entries_count -eq 0 ]]; then
         echo "Cache vide"
@@ -193,6 +203,9 @@ cache_command_clean() {
         log_info "🔍 Simulation nettoyage cache (dry-run)..."
         echo
 
+        # CORRECTION: Désactiver le mode strict pour éviter crash sur erreurs
+        set +e
+
         # Compter ce qui serait supprimé
         local would_clean=0
         while IFS=',' read -r chapter_key composite_hash clean_file; do
@@ -205,19 +218,49 @@ cache_command_clean() {
 
             if [[ "$chapter_key" =~ ^Ch([0-9]+)$ ]]; then
                 local chapter_num="${BASH_REMATCH[1]}"
-                if ! get_chapter_source_files "$chapter_num" >/dev/null 2>&1; then
+
+                # CORRECTION: Utiliser la logique corrigée pour vérifier l'existence des fichiers
+                # Au lieu de get_chapter_source_files (pattern bugué), vérifier directement
+                local chapter_files_found=false
+
+                # Pattern corrigé : chercher Ch01, Ch02, etc.
+                local padded_num=$(printf "%02d" "$chapter_num")
+                for file in 01-Manuscrit/Ch${padded_num}*.md; do
+                    if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                        chapter_files_found=true
+                        break
+                    fi
+                done
+
+                # Si pas trouvé avec zéros, essayer sans zéros (pour Ch1, Ch2, Ch3)
+                if [[ "$chapter_files_found" == "false" ]]; then
+                    for file in 01-Manuscrit/Ch${chapter_num}-*.md; do
+                        if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                            chapter_files_found=true
+                            break
+                        fi
+                    done
+                fi
+
+                # Si aucun fichier source trouvé, marquer pour suppression
+                if [[ "$chapter_files_found" == "false" ]]; then
                     should_remove=true
                 fi
             else
-                # Format obsolète
+                # Format obsolète (pas Ch[0-9]+)
                 should_remove=true
             fi
 
             if [[ "$should_remove" == "true" ]]; then
                 echo "❌ Supprimerait: $chapter_key → $clean_file"
                 ((would_clean++))
+            else
+                echo "✅ Garderait: $chapter_key → $clean_file"
             fi
-        done < <(grep -v "^#" "$SILK_CACHE_FILE")
+        done < <(grep -v "^#" "$SILK_CACHE_FILE" 2>/dev/null)
+
+        # Réactiver le mode strict
+        set -e
 
         if [[ $would_clean -eq 0 ]]; then
             echo "✅ Cache déjà propre - aucune action nécessaire"
