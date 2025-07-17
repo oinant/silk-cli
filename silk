@@ -244,6 +244,7 @@ show_help() {
         for cmd in "${available_commands[@]}"; do
             case "$cmd" in
                 init) echo      "  init        Créer un nouveau projet d'écriture" ;;
+                config) echo    "  config      Gérer la configuration d'un projet silk" ;;
                 context) echo   "  context     Générer contexte pour LLM (Claude, GPT, etc.)" ;;
                 wordcount) echo "  wordcount   Statistiques progression manuscrit" ;;
                 publish) echo   "  publish     Générer PDF du manuscrit" ;;
@@ -332,6 +333,16 @@ main() {
         log_warning "Modules core non disponibles, fonctionnalité limitée"
     fi
 
+    # Chargement configuration projet (si dans un projet SILK)
+    if is_silk_project; then
+        load_module "commands/config.sh"
+        if silk_project_config_load; then
+            log_debug "Configuration projet chargée: $MANUSCRIPT_SEPARATOR"
+        else
+            log_debug "Aucune configuration projet trouvée"
+        fi
+    fi
+
     # Installer trap pour gestion d'erreurs
     trap 'handle_silk_error $? $LINENO "$BASH_COMMAND"' ERR
 
@@ -348,7 +359,7 @@ main() {
         version)
             cmd_version
             ;;
-        cache|init|context|wordcount|publish)
+        config|cache|init|context|wordcount|publish)
             execute_modular_command "$command" "$@"
             ;;
         *)

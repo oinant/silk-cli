@@ -218,7 +218,6 @@ analyze_text_complete() {
 
 silk_analyze_manuscript() {
     local chapter_range="${1:-all}"
-    local vault_marker="${VAULT_MARKER:-## manuscrit}"
 
     if [[ ! -d "01-Manuscrit" ]]; then
         echo "❌ Répertoire 01-Manuscrit non trouvé" >&2
@@ -229,11 +228,11 @@ silk_analyze_manuscript() {
 
     # Extraction du contenu manuscrit
     for file in 01-Manuscrit/*.md; do
-        if [[ -f "$file" ]] && grep -q "$vault_marker" "$file"; then
+        if [[ -f "$file" ]] && grep -q "$" "$file"; then
             echo "📄 Extraction: $(basename "$file")"
 
             # Extraire contenu après le marqueur
-            awk -v marker="$vault_marker" '
+            awk -v marker="$MANUSCRIPT_SEPARATOR" '
             found && !/^---$/ { print }
             $0 ~ marker { found = 1; next }
             ' "$file" >> "$temp_content"
@@ -241,7 +240,7 @@ silk_analyze_manuscript() {
     done
 
     if [[ ! -s "$temp_content" ]]; then
-        echo "❌ Aucun contenu manuscrit trouvé avec le marqueur '$vault_marker'" >&2
+        echo "❌ Aucun contenu manuscrit trouvé avec le marqueur '$MANUSCRIPT_SEPARATOR'" >&2
         rm -f "$temp_content"
         return 1
     fi

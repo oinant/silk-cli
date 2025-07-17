@@ -664,8 +664,8 @@ add_wordcount_to_manuscript() {
             # Calcul simple sans silk
             local total_words=0
             for file in 01-Manuscrit/*.md; do
-                if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
-                    local words=$(sed -n '/## manuscrit/,$p' "$file" | tail -n +2 | wc -w)
+                if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
+                    local words=$(sed -n "/${MANUSCRIPT_SEPARATOR}/,\$p" "$file" | tail -n +2 | wc -w)
                     total_words=$((total_words + words))
                 fi
             done
@@ -720,7 +720,7 @@ extract_chapters_content() {
 
 extract_chapter_metadata() {
     local file="$1"
-    local marker="${VAULT_MARKER:-## manuscrit}"
+    local marker="${MANUSCRIPT_SEPARATOR}"
 
     # Extraire tout ce qui est avant le marqueur manuscrit
     if grep -q "$marker" "$file"; then

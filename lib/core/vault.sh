@@ -34,10 +34,9 @@ ensure_silk_context() {
 # === EXTRACTION CONTENU ===
 extract_manuscript_content() {
     local file="$1"
-    local marker="${2:-## manuscrit}"
 
-    if grep -q "$marker" "$file"; then
-        sed -n "/$marker/,\$p" "$file" | tail -n +2
+    if grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
+        sed -n "/$MANUSCRIPT_SEPARATOR/,\$p" "$file" | tail -n +2
     else
         log_warning "Fichier sans séparateur: $(basename "$file")"
         return 1
@@ -82,7 +81,7 @@ get_silk_project_stats() {
             ((total_files++))
 
             # Si le fichier a du contenu manuscrit
-            if grep -q "$VAULT_MARKER" "$file"; then
+            if grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
                 ((total_chapters++))
                 local words=$(extract_manuscript_content "$file" | wc -w)
                 local chars=$(extract_manuscript_content "$file" | wc -c)
@@ -145,13 +144,13 @@ validate_silk_structure() {
     # Vérifier contenu manuscrit
     local chapters_with_content=0
     for file in 01-Manuscrit/*.md; do
-        if [[ -f "$file" ]] && grep -q "$VAULT_MARKER" "$file"; then
+        if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
             ((chapters_with_content++))
         fi
     done
 
     if [[ $chapters_with_content -eq 0 ]]; then
-        log_warning "Aucun chapitre avec contenu '## manuscrit' trouvé"
+        log_warning "Aucun chapitre avec contenu '${MANUSCRIPT_SEPARATOR}' trouvé"
         ((warnings++))
     else
         log_debug "✅ $chapters_with_content chapitres avec contenu"
@@ -240,10 +239,10 @@ migrate_legacy_to_silk() {
 
     # Convertir chapitres au format SILK
     for file in 01-Manuscrit/*.md; do
-        if [[ -f "$file" ]] && ! grep -q "$VAULT_MARKER" "$file"; then
+        if [[ -f "$file" ]] && ! grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
             # Ajouter séparateur manuscrit
             echo "" >> "$file"
-            echo "$VAULT_MARKER" >> "$file"
+            echo "$MANUSCRIPT_SEPARATOR" >> "$file"
             echo "" >> "$file"
             echo "[Contenu migré du format legacy]" >> "$file"
             log_success "Converti: $(basename "$file")"

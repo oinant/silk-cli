@@ -55,28 +55,28 @@ show_publish_success() {
 # === STATISTIQUES PROJET ===
 generate_project_stats() {
     local output_format="${1:-console}"
-    
+
     local total_chapters=0
     local total_words=0
     local total_files=0
-    
+
     # Analyser tous les fichiers chapitres
     for file in 01-Manuscrit/Ch*.md; do
-        if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
+        if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
             ((total_files++))
-            
+
             # Extraire numéro de chapitre
             local chapter_num=$(extract_chapter_number "$file")
             if [[ -n "$chapter_num" ]] && [[ "$chapter_num" -gt "$total_chapters" ]]; then
                 total_chapters="$chapter_num"
             fi
-            
+
             # Compter mots
-            local words=$(sed -n '/## manuscrit/,$p' "$file" | tail -n +2 | wc -w)
+            local words=$(sed -n "/${MANUSCRIPT_SEPARATOR}/,\$p" "$file" | tail -n +2 | wc -w)
             total_words=$((total_words + words))
         fi
     done
-    
+
     case "$output_format" in
         "json")
             cat << EOF
@@ -94,11 +94,11 @@ EOF
             cat << EOF
 # Statistiques Projet SILK
 
-**Projet:** $(basename "$PWD")  
-**Chapitres:** $total_chapters  
-**Fichiers:** $total_files  
-**Mots:** $total_words  
-**Pages estimées:** $((total_words / 250))  
+**Projet:** $(basename "$PWD")
+**Chapitres:** $total_chapters
+**Fichiers:** $total_files
+**Mots:** $total_words
+**Pages estimées:** $((total_words / 250))
 
 *Généré le $(date '+%d/%m/%Y à %H:%M:%S')*
 EOF
@@ -118,33 +118,33 @@ EOF
 show_available_formats() {
     echo "📋 FORMATS SILK DISPONIBLES:"
     echo
-    
+
     if [[ ! -d "formats" ]]; then
         echo "   ❌ Répertoire formats/ manquant"
         return 1
     fi
-    
+
     local format_count=0
-    
+
     for format_file in formats/*.yaml; do
         if [[ -f "$format_file" ]] && [[ "$(basename "$format_file")" != "base.yaml" ]]; then
             local format_name=$(basename "$format_file" .yaml)
             local output_type=$(detect_output_format "$format_name")
-            
+
             # Extraire description si disponible
             local description=""
             if grep -q "^description:" "$format_file"; then
                 description=$(grep "^description:" "$format_file" | cut -d: -f2- | xargs)
             fi
-            
+
             printf "   %-12s [%s] %s\n" "$format_name" "$output_type" "$description"
             ((format_count++))
         fi
     done
-    
+
     echo
     echo "   Total: $format_count formats disponibles"
-    
+
     if [[ -f "formats/base.yaml" ]]; then
         echo "   ✅ Template de base configuré"
     else
@@ -156,16 +156,16 @@ show_available_formats() {
 show_publish_error_report() {
     local error_code="$1"
     local error_context="${2:-}"
-    
+
     echo
     log_error "Échec de la publication (code: $error_code)"
     echo
-    
+
     case "$error_code" in
         1)
             echo "🔧 DIAGNOSTIC:"
             echo "   • Vérifiez la syntaxe des fichiers chapitres"
-            echo "   • Assurez-vous que les séparateurs '## manuscrit' sont présents"
+            echo "   • Assurez-vous que les séparateurs '${MANUSCRIPT_SEPARATOR}' sont présents"
             echo "   • Vérifiez les permissions des répertoires"
             ;;
         2)
@@ -187,13 +187,13 @@ show_publish_error_report() {
             echo "   • Consultez la documentation SILK"
             ;;
     esac
-    
+
     if [[ -n "$error_context" ]]; then
         echo
         echo "💬 CONTEXTE:"
         echo "   $error_context"
     fi
-    
+
     echo
     echo "💡 AIDE:"
     echo "   • silk publish --help"
@@ -205,19 +205,19 @@ show_publish_error_report() {
 validate_publication_output() {
     local output_file="$1"
     local expected_type="${2:-pdf}"
-    
+
     if [[ ! -f "$output_file" ]]; then
         log_error "Fichier de sortie non créé: $output_file"
         return 1
     fi
-    
+
     # Vérifier taille minimale
     local file_size=$(stat -c%s "$output_file" 2>/dev/null || stat -f%z "$output_file" 2>/dev/null || echo "0")
     if [[ "$file_size" -lt 1024 ]]; then
         log_warning "Fichier de sortie très petit (${file_size} bytes)"
         return 2
     fi
-    
+
     # Vérification basique du type de fichier
     if command -v file &> /dev/null; then
         local file_type=$(file -b "$output_file" 2>/dev/null)
@@ -242,7 +242,7 @@ validate_publication_output() {
                 ;;
         esac
     fi
-    
+
     log_debug "Validation fichier de sortie: OK"
     return 0
 }
@@ -253,22 +253,22 @@ show_performance_metrics() {
     local chapters_processed="$2"
     local words_processed="$3"
     local output_file="$4"
-    
+
     local duration=$(end_timer "$start_time")
     local file_size_mb=0
-    
+
     if [[ -f "$output_file" ]]; then
         local file_size=$(stat -c%s "$output_file" 2>/dev/null || stat -f%z "$output_file" 2>/dev/null || echo "0")
         file_size_mb=$((file_size / 1024 / 1024))
     fi
-    
+
     echo
     echo "⚡ MÉTRIQUES PERFORMANCE:"
     echo "   ⏱️  Durée totale: ${duration}s"
     echo "   📚 Chapitres traités: $chapters_processed"
     echo "   📝 Mots traités: $words_processed"
     echo "   💾 Taille finale: ${file_size_mb}MB"
-    
+
     if [[ "$duration" -gt 0 ]]; then
         local words_per_second=$((words_processed / duration))
         echo "   🚀 Vitesse: $words_per_second mots/seconde"
@@ -279,7 +279,7 @@ show_performance_metrics() {
 show_system_diagnostic() {
     echo "🔧 DIAGNOSTIC SYSTÈME SILK PUBLISH:"
     echo
-    
+
     # Vérifier dépendances
     echo "📦 DÉPENDANCES:"
     if command -v pandoc &> /dev/null; then
@@ -287,13 +287,13 @@ show_system_diagnostic() {
     else
         echo "   ❌ Pandoc: non installé"
     fi
-    
+
     if command -v xelatex &> /dev/null; then
         echo "   ✅ XeLaTeX: $(xelatex --version | head -1)"
     else
         echo "   ❌ XeLaTeX: non installé"
     fi
-    
+
     # Vérifier structure projet
     echo
     echo "📁 STRUCTURE PROJET:"
@@ -303,14 +303,14 @@ show_system_diagnostic() {
     else
         echo "   ❌ Répertoire manuscrit: manquant"
     fi
-    
+
     if [[ -d "formats" ]]; then
         local format_files=$(find formats -name "*.yaml" | wc -l)
         echo "   ✅ Répertoire formats: $format_files templates"
     else
         echo "   ❌ Répertoire formats: manquant"
     fi
-    
+
     # Vérifier répertoires de sortie
     echo
     echo "📤 RÉPERTOIRES SORTIE:"
@@ -322,7 +322,7 @@ show_system_diagnostic() {
             echo "   ⚠️  $dir: n'existe pas (sera créé)"
         fi
     done
-    
+
     # Vérifier espace disque
     echo
     echo "💾 ESPACE DISQUE:"

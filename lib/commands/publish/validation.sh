@@ -127,11 +127,11 @@ dry_run_publish() {
     local total_words=0
 
     for file in 01-Manuscrit/Ch*.md; do
-        if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
+        if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
             local chapter_num=$(extract_chapter_number "$file")
             if [[ -n "$chapter_num" && "$chapter_num" -le "$max_chapters" ]]; then
                 ((available_chapters++))
-                local words=$(sed -n '/## manuscrit/,$p' "$file" | tail -n +2 | wc -w)
+                local words=$(sed -n "/${MANUSCRIPT_SEPARATOR}/,\$p" "$file" | tail -n +2 | wc -w)
                 total_words=$((total_words + words))
                 echo "   ✅ Ch$chapter_num: $words mots - $(head -1 "$file" | sed 's/^#*\s*//')"
             fi

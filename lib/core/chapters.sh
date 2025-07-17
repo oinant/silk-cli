@@ -118,7 +118,7 @@ collect_chapters_content() {
 
         # Trouver tous les fichiers pour ce chapitre (parties multiples)
         for file in 01-Manuscrit/Ch*.md; do
-            if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
+            if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
                 local file_chapter_num=$(extract_chapter_number_from_filename "$file")
                 if [[ "$file_chapter_num" == "$chapter_num" ]]; then
                     chapter_files+=("$file")
@@ -146,7 +146,7 @@ collect_chapters_content() {
                 fi
             fi
 
-            # Extraire contenu après "## manuscrit"
+            # Extraire contenu après "$MANUSCRIPT_SEPARATOR"
             local part_content
             if part_content=$(extract_manuscript_content "$file"); then
                 if [[ -n "$part_content" ]]; then

@@ -9,8 +9,8 @@ extract_manuscript_content() {
         return 1
     fi
 
-    # Extraire tout après "## manuscrit"
-    sed -n '/## manuscrit/,$p' "$file" | tail -n +2
+    # Extraire tout après "$MANUSCRIPT_SEPARATOR"
+    sed -n "/${MANUSCRIPT_SEPARATOR}/,\$p" "$file" | tail -n +2
 }
 
 # === CRÉATION FICHIER NETTOYÉ ===
@@ -254,8 +254,8 @@ create_stats_page() {
         # Calcul statistiques basiques
         local total_words=0
         for file in 01-Manuscrit/Ch*.md; do
-            if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
-                local words=$(sed -n '/## manuscrit/,$p' "$file" | tail -n +2 | wc -w)
+            if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
+                local words=$(sed -n "/${MANUSCRIPT_SEPARATOR}/,\$p" "$file" | tail -n +2 | wc -w)
                 total_words=$((total_words + words))
             fi
         done

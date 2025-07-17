@@ -19,6 +19,7 @@ SILK_CONFIG_KEYS=(
     "AUTHOR_NAME"
     "AUTHOR_PSEUDO"
     "COVER"
+    "MANUSCRIPT_SEPARATOR"
 )
 
 # === FONCTIONS CONFIGURATION ===
@@ -33,6 +34,7 @@ silk_project_config_load() {
     AUTHOR_NAME=""
     AUTHOR_PSEUDO=""
     COVER=""
+    MANUSCRIPT_SEPARATOR="## manuscrit"
 
     # Charger depuis fichier si existe
     if [[ -f "$SILK_CONFIG_FILE" ]]; then
@@ -62,6 +64,7 @@ DEFAULT_FORMAT="$DEFAULT_FORMAT"
 AUTHOR_NAME="$AUTHOR_NAME"
 AUTHOR_PSEUDO="$AUTHOR_PSEUDO"
 COVER="$COVER"
+MANUSCRIPT_SEPARATOR="$MANUSCRIPT_SEPARATOR"
 EOF
 
     log_debug "Configuration projet sauvegardée: $SILK_CONFIG_FILE"
@@ -138,6 +141,9 @@ silk_project_config_set() {
         COVER)
             COVER="$value"
             ;;
+        MANUSCRIPT_SEPARATOR)
+            MANUSCRIPT_SEPARATOR="$value"
+            ;;
     esac
 
     # Sauvegarder
@@ -161,6 +167,7 @@ silk_project_config_get() {
         AUTHOR_NAME) echo "$AUTHOR_NAME" ;;
         AUTHOR_PSEUDO) echo "$AUTHOR_PSEUDO" ;;
         COVER) echo "$COVER" ;;
+        MANUSCRIPT_SEPARATOR) echo "$MANUSCRIPT_SEPARATOR" ;;
         *)
             log_error "Clé inconnue: $key"
             return 1
@@ -183,6 +190,7 @@ silk_project_config_list() {
     echo "Nom auteur              : ${AUTHOR_NAME:-non défini}"
     echo "Pseudonyme auteur       : ${AUTHOR_PSEUDO:-non défini}"
     echo "Image de couverture     : ${COVER:-non définie}"
+    echo "Séparateur Manuscrit    : ${MANUSCRIPT_SEPARATOR}"
     echo ""
     echo "📁 Fichier config       : $SILK_CONFIG_FILE"
 
@@ -288,6 +296,7 @@ CLÉS DISPONIBLES:
   AUTHOR_NAME               Nom auteur
   AUTHOR_PSEUDO             Pseudonyme auteur
   COVER                     Cover image path
+  MANUSCRIPT_SEPARATOR      Séparateur de manuscrit (défaut: ## manuscrit)
 
 EXEMPLES:
   silk config --init
@@ -296,6 +305,7 @@ EXEMPLES:
   silk config --set AUTHOR_NAME="Jane Doe"
   silk config --get TITLE
   silk config --set TARGET_WORDS=120000
+  silk config --set MANUSCRIPT_SEPARATOR="## manuscrit"
 
 FICHIER:
   Configuration stockée dans: .silk/config

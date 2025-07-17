@@ -116,7 +116,7 @@ SEUILS DE RÉFÉRENCE SILK:
 
 FONCTIONNALITÉS AVANCÉES:
   - Regroupement automatique chapitres bis (Ch23 + Ch23-1 = Ch23)
-  - Détection séparateur ## manuscrit obligatoire
+  - Détection séparateur MANUSCRIPT_SEPARATOR obligatoire
   - Analyse régularité et recommandations personnalisées
   - Identification chapitres à développer en priorité
   - Positionnement dans seuils éditoriaux
@@ -157,7 +157,7 @@ analyze_silk_wordcount() {
             log_debug "Fichier: $(basename "$file"), base_num: $base_num, words: $word_count"
 
             # Vérifier séparateur
-            if ! grep -q "$VAULT_MARKER" "$file"; then
+            if ! grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
                 ((files_without_separator++))
                 log_debug "⚠️  FICHIER SANS SÉPARATEUR: $(basename "$file")"
                 continue
@@ -210,7 +210,7 @@ analyze_silk_wordcount() {
 
     if [[ $total_chapters -eq 0 ]]; then
         log_warning "Aucun chapitre avec contenu trouvé"
-        echo "💡 Ajoutez du contenu après '$VAULT_MARKER' dans vos chapitres"
+        echo "💡 Ajoutez du contenu après '$MANUSCRIPT_SEPARATOR' dans vos chapitres"
         return
     fi
 
@@ -418,15 +418,15 @@ show_separator_validation() {
     local files_without_separator="$1"
 
     echo
-    echo "📋 SILK VÉRIFICATION - SÉPARATEURS ## manuscrit"
+    echo "📋 SILK VÉRIFICATION - SÉPARATEURS ${MANUSCRIPT_SEPARATOR}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     if [[ $files_without_separator -eq 0 ]]; then
-        echo "✅ Tous les chapitres utilisent le séparateur '$VAULT_MARKER'"
+        echo "✅ Tous les chapitres utilisent le séparateur '$MANUSCRIPT_SEPARATOR'"
         echo "🕸️ Structure SILK conforme pour génération contexte LLM"
     else
         echo "⚠️  $files_without_separator fichier(s) sans séparateur détecté(s)"
-        echo "   💡 Ajoutez '$VAULT_MARKER' avant le contenu de chaque chapitre"
+        echo "   💡 Ajoutez '$MANUSCRIPT_SEPARATOR' avant le contenu de chaque chapitre"
         echo "   💡 Cela permet d'exclure les métadonnées du comptage et contexte"
         echo "   🔧 Utilisez: silk context pour vérifier la structure"
     fi
@@ -452,13 +452,13 @@ is_bis_chapter() {
 extract_silk_manuscrit_content() {
     local file="$1"
 
-    if grep -q "$VAULT_MARKER" "$file"; then
+    if grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
         # Extraire contenu après séparateur, en gérant les erreurs
         local content=""
         local found_marker=false
 
         while IFS= read -r line; do
-            if [[ "$line" == *"$VAULT_MARKER"* ]]; then
+            if [[ "$line" == *"$MANUSCRIPT_SEPARATOR"* ]]; then
                 found_marker=true
                 continue
             fi

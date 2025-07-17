@@ -226,7 +226,7 @@ cache_command_clean() {
                 # Pattern corrigé : chercher Ch01, Ch02, etc.
                 local padded_num=$(printf "%02d" "$chapter_num")
                 for file in 01-Manuscrit/Ch${padded_num}*.md; do
-                    if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                    if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file" 2>/dev/null; then
                         chapter_files_found=true
                         break
                     fi
@@ -235,7 +235,7 @@ cache_command_clean() {
                 # Si pas trouvé avec zéros, essayer sans zéros (pour Ch1, Ch2, Ch3)
                 if [[ "$chapter_files_found" == "false" ]]; then
                     for file in 01-Manuscrit/Ch${chapter_num}-*.md; do
-                        if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                        if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file" 2>/dev/null; then
                             chapter_files_found=true
                             break
                         fi

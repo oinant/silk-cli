@@ -202,7 +202,7 @@ if ../silk init "Test Project" --genre polar-psychologique --author "Test Author
             test_pass "Chapitre exemple créé"
 
             # Vérifier séparateur SILK
-            if grep -q "## manuscrit" "01-Manuscrit/Ch01-Premier-Chapitre.md"; then
+            if grep -q "$MANUSCRIPT_SEPARATOR" "01-Manuscrit/Ch01-Premier-Chapitre.md"; then
                 test_pass "Séparateur SILK présent"
             else
                 test_fail "Séparateur SILK manquant"

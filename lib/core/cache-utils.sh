@@ -69,7 +69,7 @@ get_chapter_source_files() {
 
     # Collecter tous les fichiers sources pour ce chapitre
     for file in 01-Manuscrit/Ch*.md; do
-        if [[ -f "$file" ]] && grep -q "## manuscrit" "$file"; then
+        if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file"; then
             local file_chapter_num=$(extract_chapter_number_from_filename "$file")
             if [[ "$file_chapter_num" == "$chapter_num" ]]; then
                 chapter_files+=("$file")
@@ -371,7 +371,7 @@ cache_cleanup() {
             # Pattern corrigé : chercher Ch01, Ch02, etc.
             local padded_num=$(printf "%02d" "$chapter_num")
             for file in 01-Manuscrit/Ch${padded_num}*.md; do
-                if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file" 2>/dev/null; then
                     chapter_files_found=true
                     break
                 fi
@@ -380,7 +380,7 @@ cache_cleanup() {
             # Si pas trouvé avec zéros, essayer sans zéros
             if [[ "$chapter_files_found" == "false" ]]; then
                 for file in 01-Manuscrit/Ch${chapter_num}-*.md; do
-                    if [[ -f "$file" ]] && grep -q "## manuscrit" "$file" 2>/dev/null; then
+                    if [[ -f "$file" ]] && grep -q "$MANUSCRIPT_SEPARATOR" "$file" 2>/dev/null; then
                         chapter_files_found=true
                         break
                     fi

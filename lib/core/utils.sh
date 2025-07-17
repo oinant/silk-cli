@@ -156,7 +156,7 @@ extract_chapter_number() {
 
 extract_manuscript_content() {
     local file="$1"
-    local marker="${2:-## manuscrit}"
+    local marker="$2"
 
     log_debug "🔍 extract_manuscript_content: fichier='$file', marker='$marker'"
 
@@ -444,13 +444,13 @@ validate_silk_structure() {
     # Vérifier contenu manuscrit
     local chapters_with_content=0
     for file in 01-Manuscrit/*.md; do
-        if [[ -f "$file" ]] && grep -q "${VAULT_MARKER:-## manuscrit}" "$file"; then
+        if [[ -f "$file" ]] && grep -q "${MANUSCRIPT_SEPARATOR}" "$file"; then
             ((chapters_with_content++))
         fi
     done
 
     if [[ $chapters_with_content -eq 0 ]]; then
-        log_warning "Aucun chapitre avec contenu '${VAULT_MARKER:-## manuscrit}' trouvé"
+        log_warning "Aucun chapitre avec contenu '${MANUSCRIPT_SEPARATOR}' trouvé"
         ((warnings++))
     else
         log_debug "✅ $chapters_with_content chapitres avec contenu"

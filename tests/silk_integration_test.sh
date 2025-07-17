@@ -102,25 +102,25 @@ on:
 jobs:
   test-silk:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Make SILK executable
       run: chmod +x silk
-    
+
     - name: Run SILK basic tests
       run: |
         chmod +x tests/test_silk_basic.sh
         ./tests/test_silk_basic.sh
-    
+
     - name: Test SILK installation script
       run: |
         chmod +x install.sh
         # Test dry run sans install réelle
         INSTALL_DIR=/tmp/silk-test ./install.sh
         /tmp/silk-test/silk --version
-    
+
     - name: Test SILK project creation
       run: |
         ./silk init "CI Test Project" --genre polar-psychologique --author "CI Test" --yes
@@ -134,10 +134,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Test SILK basic functionality
       shell: bash
       run: |
@@ -149,29 +149,29 @@ jobs:
   integration-test:
     runs-on: ubuntu-latest
     needs: [test-silk, compatibility-silk]
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Full SILK workflow test
       run: |
         chmod +x silk
-        
+
         # Créer projet test
         ./silk init "Integration Test" --genre fantasy --author "GitHub CI" --yes
         cd integration-test
-        
+
         # Créer contenu minimal
         echo "# Ch.01 : Test" > 01-Manuscrit/Ch01-Test.md
-        echo "## manuscrit" >> 01-Manuscrit/Ch01-Test.md
+        echo "$MANUSCRIPT_SEPARATOR" >> 01-Manuscrit/Ch01-Test.md
         echo "Contenu de test pour CI." >> 01-Manuscrit/Ch01-Test.md
-        
+
         # Test contexte
         ../silk context "Test CI"
-        
+
         # Test statistiques
         ../silk wordcount
-        
+
         # Test config
         ../silk config --set SILK_AUTHOR_NAME="CI Integration"
         ../silk config --get SILK_AUTHOR_NAME
@@ -195,7 +195,7 @@ INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 echo "🕷️ Installation SILK CLI v$SILK_VERSION"
 echo "Smart Integrated Literary Kit - Structured Intelligence for Literary Kreation"
 
-# Détection OS  
+# Détection OS
 case "$OSTYPE" in
     msys*|cygwin*|mingw*)
         INSTALL_DIR="${INSTALL_DIR:-$HOME/bin}"
@@ -243,7 +243,7 @@ echo "📁 Vérification compatibilité structure:"
 # Structure attendue SILK vs existante
 declare -A structure_mapping=(
     ["01-Manuscrit"]="01-Manuscrit"
-    ["02-Personnages"]="02-Personnages" 
+    ["02-Personnages"]="02-Personnages"
     ["04-Concepts"]="04-Concepts"
     ["outputs/context"]="outputs/context"
     ["outputs/publish"]="outputs/publish"
@@ -261,7 +261,7 @@ cat > "test-migration.sh" << 'EOF'
 
 echo "📦 Simulation migration projet existant vers SILK..."
 
-# Créer structure "legacy" 
+# Créer structure "legacy"
 mkdir -p legacy-project/{01-Manuscrit,02-Personnages,04-Concepts}
 
 cat > legacy-project/01-Manuscrit/Ch01-Legacy.md << 'LEGACY'
@@ -290,9 +290,9 @@ mkdir -p {00-instructions-llm,outputs/{context,publish,temp},formats,99-Template
 # Conversion automatique format SILK
 echo "🔄 Conversion format SILK..."
 for file in 01-Manuscrit/*.md; do
-    if [[ -f "$file" && ! grep -q "## manuscrit" "$file" ]]; then
+    if [[ -f "$file" && ! grep -q "$MANUSCRIPT_SEPARATOR" "$file" ]]; then
         echo "" >> "$file"
-        echo "## manuscrit" >> "$file"
+        echo "$MANUSCRIPT_SEPARATOR" >> "$file"
         echo "" >> "$file"
         echo "[Contenu legacy migré - à réviser]" >> "$file"
         echo "✅ $(basename "$file") converti au format SILK"
@@ -332,7 +332,7 @@ Modern CLI workflow for authors with LLM integration.
 
 SILK weaves together all aspects of modern novel writing:
 - **Smart** templates adapted by genre and market
-- **Integrated** workflow from concept to publication  
+- **Integrated** workflow from concept to publication
 - **Literary** focus on sophisticated fiction
 - **Kit** complete toolbox for authors
 
@@ -513,7 +513,7 @@ cat > "silk-meta.json" << 'EOF'
     "output_formats": ["digital", "iphone", "kindle", "book"],
     "features": [
       "smart-templates",
-      "llm-integration", 
+      "llm-integration",
       "multi-format-publishing",
       "progress-analytics",
       "cross-platform"
