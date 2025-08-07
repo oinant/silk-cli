@@ -145,7 +145,7 @@ execute_pandoc_generation() {
                 "--metadata" "title=$TITLE"
                 "--metadata" "author=$AUTHOR_NAME"
                 "--metadata" "lang=$LANGUAGE"
-                #"--epub-cover-image=$COVER"
+                "--epub-cover-image=$COVER"
                 #"--css=epub.css"
                 "--verbose"
             )
