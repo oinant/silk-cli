@@ -1,0 +1,97 @@
+# Format EPUB pour SILK - Optimisé mobile
+output_type: epub
+
+# Métadonnées EPUB
+language: fr-FR
+epub-chapter-level: 2
+toc-depth: 2
+
+# CSS intégré pour lecture mobile optimale
+css: |
+  /* Optimisation lecture mobile */
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.1em;
+    line-height: 1.4;
+    margin: 0;
+    padding: 0.5em;
+    text-align: justify;
+    color: #2c2c2c;
+  }
+
+  /* Titres avec police système */
+  h1, h2, h3 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+  }
+
+  h1 {
+    font-size: 1.6em;
+    text-align: center;
+    page-break-before: always;
+  }
+  h2 {
+    font-size: 1.3em;
+    margin-top: 2em;
+  }
+
+  /* Paragraphes avec indentation française */
+  p {
+    margin: 0;
+    text-indent: 1.2em;
+    margin-bottom: 0.3em;
+  }
+
+  /* Premier paragraphe sans indent */
+  h1 + p, h2 + p, h3 + p {
+    text-indent: 0;
+  }
+
+  /* Dialogues en retrait */
+  p:has(> em:first-child) {
+    text-indent: 0;
+    margin-left: 1em;
+  }
+
+  /* Séparateurs de scène élégants */
+  hr {
+    border: none;
+    text-align: center;
+    margin: 2em 0;
+    page-break-inside: avoid;
+  }
+
+  hr:after {
+    content: "⁂";
+    font-size: 1.5em;
+    color: #666;
+  }
+
+  /* Emphasis et strong */
+  em { font-style: italic; }
+  strong { font-weight: bold; }
+
+  /* Mode sombre automatique */
+  @media (prefers-color-scheme: dark) {
+    body {
+      background-color: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    h1, h2, h3 {
+      color: #f0f0f0;
+    }
+
+    hr:after {
+      color: #999;
+    }
+  }
+
+# Options EPUB avancées
+epub-metadata: |
+  <meta property="dcterms:modified">2025-01-01T00:00:00Z</meta>
+  <meta name="generator" content="SILK" />
+  <meta property="schema:accessibilityFeature">readingOrder</meta>
+  <meta property="schema:accessibilityFeature">structuralNavigation</meta>

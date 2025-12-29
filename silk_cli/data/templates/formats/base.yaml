@@ -1,0 +1,21 @@
+title: "{{PROJECT_NAME}}"
+author: "{{AUTHOR_NAME}}"
+date: "{{DATE}}"
+lang: fr-FR
+fontsize: 11pt
+linestretch: 1.2
+documentclass: book
+classoption:
+  - openany
+  - twoside
+mainfont: "EB Garamond"
+mainfontoptions:
+  - Numbers=OldStyle
+  - Ligatures=TeX
+indent: true
+block-headings: true
+header-includes: |
+  \usepackage[french]{babel}
+  \usepackage{microtype}
+  \clubpenalty=10000
+  \widowpenalty=10000

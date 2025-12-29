@@ -14,6 +14,7 @@ from silk_cli.commands import config
 from silk_cli.commands.wordcount import wordcount
 from silk_cli.commands.context import context
 from silk_cli.commands.cache import cache
+from silk_cli.commands.init import init
 
 app = typer.Typer(
     name="silk",
@@ -29,6 +30,7 @@ app.add_typer(config.app, name="config")
 app.command(name="wordcount")(wordcount)
 app.command(name="context")(context)
 app.command(name="cache")(cache)
+app.command(name="init")(init)
 
 
 @app.command()

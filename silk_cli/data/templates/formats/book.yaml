@@ -1,0 +1,11 @@
+geometry: "a5paper,inner=2.5cm,outer=2cm,top=2.5cm,bottom=2.5cm"
+fontsize: 11pt
+linestretch: 1.4
+header-includes: |
+  \setlength{\parskip}{0.3em}
+  \setlength{\parindent}{1.5em}
+  \usepackage[french]{babel}
+  \usepackage{microtype}
+  \widowpenalty=10000
+  \clubpenalty=10000
+

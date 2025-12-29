@@ -1,0 +1,9 @@
+geometry: "paperwidth=4.7in,paperheight=8.4in,margin=0.4in"
+fontsize: 11pt
+linestretch: 1.2
+header-includes: |
+  \setlength{\parskip}{0.4em}
+  \setlength{\parindent}{0.8em}
+  \usepackage{microtype}
+  \setlength{\emergencystretch}{3em}
+

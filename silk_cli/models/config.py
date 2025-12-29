@@ -59,7 +59,7 @@ class SilkConfig(BaseModel):
         content = config_path.read_text(encoding="utf-8")
 
         # Parse KEY="VALUE" or KEY=VALUE format
-        pattern = re.compile(r'^(\w+)=["\']?([^"\']*)["\']?$', re.MULTILINE)
+        pattern = re.compile(r'^(\w+)=["\']?([^"\'\n]*)["\']?$', re.MULTILINE)
         for match in pattern.finditer(content):
             key = match.group(1).lower()
             value = match.group(2)
