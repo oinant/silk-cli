@@ -15,6 +15,7 @@ from silk_cli.commands.wordcount import wordcount
 from silk_cli.commands.context import context
 from silk_cli.commands.cache import cache
 from silk_cli.commands.init import init
+from silk_cli.commands.publish import publish
 
 app = typer.Typer(
     name="silk",
@@ -31,6 +32,7 @@ app.command(name="wordcount")(wordcount)
 app.command(name="context")(context)
 app.command(name="cache")(cache)
 app.command(name="init")(init)
+app.command(name="publish")(publish)
 
 
 @app.command()
