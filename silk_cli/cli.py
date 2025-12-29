@@ -9,7 +9,9 @@ from rich.console import Console
 from rich.panel import Panel
 
 from silk_cli import __version__
-from silk_cli.core.project import find_silk_root, is_silk_project
+from silk_cli.core.project import find_silk_root
+from silk_cli.commands import config
+from silk_cli.commands.wordcount import wordcount
 
 app = typer.Typer(
     name="silk",
@@ -19,6 +21,10 @@ app = typer.Typer(
 )
 
 console = Console()
+
+# Register subcommands
+app.add_typer(config.app, name="config")
+app.command(name="wordcount")(wordcount)
 
 
 @app.command()

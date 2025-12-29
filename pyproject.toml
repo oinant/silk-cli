@@ -18,7 +18,7 @@ packages = [{ include = "silk_cli" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-typer = { extras = ["all"], version = "^0.12" }
+typer = { extras = ["all"], version = "^0.16" }
 pydantic = "^2.5"
 rich = "^13.7"
 pyyaml = "^6.0"
