@@ -223,8 +223,8 @@ def _create_project(
         language=language,
         target_words=target_words,
         target_chapters=target_chapters,
-        author_name=author_name or None,
-        author_pseudo=author_pseudo or None,
+        author_name=author_name or "",
+        author_pseudo=author_pseudo,
     )
     config.save(silk_dir / "config")
 

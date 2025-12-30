@@ -40,7 +40,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["silk_cli/tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
 
