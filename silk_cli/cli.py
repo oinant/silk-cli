@@ -4,6 +4,8 @@ SILK CLI - Main entry point.
 Smart Integrated Literary Kit - Modern CLI for authors with LLM integration.
 """
 
+from typing import Optional
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -16,6 +18,14 @@ from silk_cli.commands.init import init
 from silk_cli.commands.publish import publish
 from silk_cli.commands.wordcount import wordcount
 from silk_cli.core.project import find_silk_root
+
+
+def version_callback(value: bool) -> None:
+    """Print version and exit."""
+    if value:
+        print(f"SILK CLI v{__version__}")
+        raise typer.Exit()
+
 
 app = typer.Typer(
     name="silk",
@@ -58,7 +68,12 @@ def version() -> None:
 
 
 @app.callback()
-def main() -> None:
+def main(
+    version: Optional[bool] = typer.Option(
+        None, "--version", "-V", callback=version_callback, is_eager=True,
+        help="Show version and exit."
+    ),
+) -> None:
     """
     SILK - Smart Integrated Literary Kit.
 

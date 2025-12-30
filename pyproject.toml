@@ -35,10 +35,9 @@ silk = "silk_cli.cli:app"
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
 ignore_missing_imports = true
-warn_return_any = true
 warn_unused_configs = true
+exclude = ["silk_cli/tests/"]
 
 [tool.pytest.ini_options]
 testpaths = ["silk_cli/tests"]

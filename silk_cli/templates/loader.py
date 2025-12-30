@@ -74,7 +74,7 @@ def substitute_variables(content: str, variables: dict[str, str]) -> str:
     result = content
 
     # Handle conditional substitution: {{VAR:+text if VAR exists}}
-    def replace_conditional(match):
+    def replace_conditional(match: re.Match[str]) -> str:
         var_name = match.group(1)
         suffix = match.group(2)
         value = variables.get(var_name, "")
@@ -104,20 +104,22 @@ def get_template_path(template_name: str, category: str = "common") -> Optional[
     """
     # Try to find in package data
     try:
-        with resources.files("silk_cli.data.templates") as templates_dir:
-            template_path = Path(templates_dir) / category / f"{template_name}.template"
-            if template_path.exists():
-                return template_path
+        templates_dir = resources.files("silk_cli.data.templates")
+        base_path = Path(str(templates_dir))
 
-            # Try .md extension
-            template_path = Path(templates_dir) / category / f"{template_name}.md"
-            if template_path.exists():
-                return template_path
+        template_path = base_path / category / f"{template_name}.template"
+        if template_path.exists():
+            return template_path
 
-            # Try .yaml extension
-            template_path = Path(templates_dir) / category / f"{template_name}.yaml"
-            if template_path.exists():
-                return template_path
+        # Try .md extension
+        template_path = base_path / category / f"{template_name}.md"
+        if template_path.exists():
+            return template_path
+
+        # Try .yaml extension
+        template_path = base_path / category / f"{template_name}.yaml"
+        if template_path.exists():
+            return template_path
     except (TypeError, FileNotFoundError):
         pass
 

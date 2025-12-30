@@ -6,7 +6,7 @@ Handles chapter representation, multi-part grouping, and range parsing.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Set
+from typing import Iterator, Optional, Set
 
 
 @dataclass
@@ -168,7 +168,7 @@ class ChapterRange:
         """Support 'in' operator."""
         return self.contains(chapter_num)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[int]:
         """Iterate over chapter numbers in sorted order."""
         return iter(sorted(self.chapters))
 
