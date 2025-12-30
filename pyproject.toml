@@ -15,6 +15,7 @@ classifiers = [
     "Topic :: Artistic Software",
 ]
 packages = [{ include = "silk_cli" }]
+include = ["silk_cli/data/**/*.yaml"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
