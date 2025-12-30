@@ -11,7 +11,6 @@ from rich.table import Table
 from silk_cli.core.cache import SilkCache
 from silk_cli.core.project import load_project_config
 
-
 console = Console()
 
 
@@ -89,7 +88,9 @@ def _run_cleanup(silk_cache: SilkCache, force: bool) -> None:
     entries_removed, files_removed = silk_cache.cleanup(force=force)
 
     if force:
-        console.print(f"[green]Cache cleared:[/green] {entries_removed} entries, {files_removed} files")
+        console.print(
+            f"[green]Cache cleared:[/green] {entries_removed} entries, {files_removed} files"
+        )
     elif entries_removed > 0:
         console.print(f"[green]Cleaned up:[/green] {entries_removed} invalid entries")
     else:

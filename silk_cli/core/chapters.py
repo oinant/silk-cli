@@ -10,7 +10,6 @@ from typing import Optional
 
 from silk_cli.models.chapter import Chapter, ChapterGroup, ChapterRange
 
-
 # Pattern to match chapter filenames: Ch01.md, Ch23-1.md, Ch07-2-suite.md, etc.
 CHAPTER_PATTERN = re.compile(
     r"^[Cc]h(\d+)(?:-(\d+))?.*\.md$"

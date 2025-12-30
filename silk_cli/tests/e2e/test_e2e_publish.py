@@ -3,14 +3,13 @@ End-to-end tests for silk publish command.
 """
 
 import os
-import shutil
-import pytest
 from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from silk_cli.cli import app
 from silk_cli.publishing.pandoc import check_pandoc_available, check_xelatex_available
-
 
 runner = CliRunner()
 

@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from silk_cli.core.chapters import collect_chapters, extract_manuscript_content
-from silk_cli.core.project import load_project_config, get_manuscript_dir, get_outputs_dir
+from silk_cli.core.project import get_manuscript_dir, get_outputs_dir, load_project_config
 from silk_cli.models.chapter import ChapterRange
 from silk_cli.publishing.pandoc import (
     PandocOptions,
@@ -180,7 +180,6 @@ def _generate_output(
     with_stats: bool,
 ):
     """Generate the actual output file."""
-    import tempfile
 
     outputs_dir = get_outputs_dir(root)
     publish_dir = outputs_dir / "publish"
@@ -343,7 +342,9 @@ def _show_dry_run(groups: dict, format_name: str, output_type: OutputType) -> No
         console.print(f"  Ch{num:02d}: {group.title}{parts} [{group.total_words:,} words]")
 
 
-def _show_success(result, format_name: str, chapters_count: int, french_quotes: bool, auto_dashes: bool) -> None:
+def _show_success(
+    result, format_name: str, chapters_count: int, french_quotes: bool, auto_dashes: bool
+) -> None:
     """Show success message."""
     console.print()
     console.print(

@@ -9,7 +9,6 @@ from typing import Optional
 
 from silk_cli.models.chapter import ChapterGroup
 
-
 # Editorial thresholds (word counts)
 EDITORIAL_THRESHOLDS = {
     40_000: ("Novella courte", "~160 pages"),

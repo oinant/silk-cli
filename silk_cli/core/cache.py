@@ -13,7 +13,6 @@ from typing import Optional
 
 from silk_cli.core.project import get_config_dir
 
-
 # Cache constants
 CACHE_FILE_NAME = "cleanedfilescache.csv"
 CLEAN_FILES_DIR = "outputs/temp"

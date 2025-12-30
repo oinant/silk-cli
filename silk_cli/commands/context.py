@@ -17,10 +17,9 @@ from silk_cli.core.context import (
     ContextOptions,
     auto_detect_files,
 )
-from silk_cli.core.project import load_project_config, get_manuscript_dir
+from silk_cli.core.project import get_manuscript_dir, load_project_config
 from silk_cli.core.prompts import PREDEFINED_PROMPTS, get_predefined_prompt
 from silk_cli.models.chapter import ChapterRange
-
 
 console = Console()
 

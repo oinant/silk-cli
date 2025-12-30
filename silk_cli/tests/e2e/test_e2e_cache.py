@@ -3,12 +3,11 @@ End-to-end tests for silk cache command.
 """
 
 import os
-import pytest
 from pathlib import Path
+
 from typer.testing import CliRunner
 
 from silk_cli.cli import app
-
 
 runner = CliRunner()
 
@@ -32,8 +31,8 @@ class TestCacheCommand:
 
         assert result.exit_code == 0
 
-    def test_cache_stats(self, silk_project: Path):
-        """Test cache stats command."""
+    def test_cache_stats_flag(self, silk_project: Path):
+        """Test cache stats command with --stats flag."""
         os.chdir(silk_project)
         result = runner.invoke(app, ["cache", "--stats"])
 

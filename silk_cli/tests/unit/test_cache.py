@@ -4,14 +4,13 @@ Unit tests for SILK cache system.
 Tests MD5 hashing and cache management without external dependencies.
 """
 
-import pytest
 from pathlib import Path
 
 from silk_cli.core.cache import (
     CacheEntry,
     SilkCache,
-    calculate_file_hash,
     calculate_composite_hash,
+    calculate_file_hash,
 )
 
 

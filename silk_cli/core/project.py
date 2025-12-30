@@ -9,7 +9,6 @@ from typing import Optional
 
 from silk_cli.models.config import SilkConfig
 
-
 # Required directories for a valid SILK project
 SILK_REQUIRED_DIRS = ["01-Manuscrit", "02-Personnages", "04-Concepts"]
 

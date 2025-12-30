@@ -2,14 +2,12 @@
 SILK config command - Manage project configuration.
 """
 
-from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from silk_cli.core.project import ensure_silk_context, load_project_config, get_config_dir
-from silk_cli.models.config import SilkConfig
+from silk_cli.core.project import get_config_dir, load_project_config
 
 app = typer.Typer(help="Manage SILK project configuration.")
 console = Console()
@@ -36,7 +34,7 @@ def _show_config() -> None:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 
-    console.print(f"\n[bold purple]SILK Project Configuration[/bold purple]")
+    console.print("\n[bold purple]SILK Project Configuration[/bold purple]")
     console.print(f"[dim]Location: {root}[/dim]\n")
 
     table = Table(show_header=True, header_style="bold")

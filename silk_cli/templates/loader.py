@@ -9,7 +9,6 @@ from importlib import resources
 from pathlib import Path
 from typing import Optional
 
-
 # SILK project directory structure
 SILK_PROJECT_DIRS = [
     "00-instructions-llm",

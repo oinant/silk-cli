@@ -9,13 +9,13 @@ from rich.console import Console
 from rich.panel import Panel
 
 from silk_cli import __version__
-from silk_cli.core.project import find_silk_root
 from silk_cli.commands import config
-from silk_cli.commands.wordcount import wordcount
-from silk_cli.commands.context import context
 from silk_cli.commands.cache import cache
+from silk_cli.commands.context import context
 from silk_cli.commands.init import init
 from silk_cli.commands.publish import publish
+from silk_cli.commands.wordcount import wordcount
+from silk_cli.core.project import find_silk_root
 
 app = typer.Typer(
     name="silk",

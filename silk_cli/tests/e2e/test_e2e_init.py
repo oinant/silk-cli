@@ -3,12 +3,12 @@ End-to-end tests for silk init command.
 """
 
 import os
-import pytest
 from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from silk_cli.cli import app
-
 
 runner = CliRunner()
 

@@ -12,12 +12,12 @@ from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
 
 from silk_cli.core.chapters import collect_chapters, get_max_chapter_number
-from silk_cli.core.project import ensure_silk_context, load_project_config, get_manuscript_dir
+from silk_cli.core.project import get_manuscript_dir, load_project_config
 from silk_cli.core.statistics import (
+    EDITORIAL_THRESHOLDS,
+    ManuscriptStats,
     calculate_manuscript_stats,
     get_editorial_position,
-    ManuscriptStats,
-    EDITORIAL_THRESHOLDS,
 )
 from silk_cli.models.chapter import ChapterRange
 

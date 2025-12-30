@@ -4,16 +4,15 @@ Unit tests for SILK statistics calculations.
 Tests manuscript statistics and editorial categories without IO.
 """
 
-import pytest
 from pathlib import Path
 
 from silk_cli.core.statistics import (
-    ManuscriptStats,
-    ChapterStats,
-    calculate_manuscript_stats,
-    get_editorial_position,
     EDITORIAL_THRESHOLDS,
     WORDS_PER_PAGE,
+    ChapterStats,
+    ManuscriptStats,
+    calculate_manuscript_stats,
+    get_editorial_position,
 )
 from silk_cli.models.chapter import Chapter, ChapterGroup
 

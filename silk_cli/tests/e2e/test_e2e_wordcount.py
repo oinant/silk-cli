@@ -3,12 +3,11 @@ End-to-end tests for silk wordcount command.
 """
 
 import os
-import pytest
 from pathlib import Path
+
 from typer.testing import CliRunner
 
 from silk_cli.cli import app
-
 
 runner = CliRunner()
 

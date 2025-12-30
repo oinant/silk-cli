@@ -3,7 +3,6 @@ SILK init command - Create new literary projects.
 """
 
 import subprocess
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -74,7 +73,8 @@ def init(
     if not yes:
         project_name, genre, language, target_words, target_chapters, author_name, author_pseudo = (
             _run_interactive_setup(
-                project_name, genre, language, target_words, target_chapters, author_name, author_pseudo
+                project_name, genre, language, target_words,
+                target_chapters, author_name, author_pseudo
             )
         )
 
@@ -368,7 +368,7 @@ SILK tisse ensemble tous les éléments narratifs comme une araignée tisse sa t
 
 def _create_first_chapter(project_dir: Path, project_name: str) -> None:
     """Create first chapter template."""
-    chapter_content = f"""# Ch.01 : Premier chapitre
+    chapter_content = """# Ch.01 : Premier chapitre
 
 ## Objectifs SILK
 - [ ] Introduire le protagoniste

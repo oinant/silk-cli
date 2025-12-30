@@ -4,12 +4,11 @@ Unit tests for SILK chapter parsing.
 Tests chapter detection, parsing, and word counting without IO.
 """
 
-import pytest
 
 from silk_cli.core.chapters import (
     CHAPTER_PATTERN,
-    parse_chapter_filename,
     count_words,
+    parse_chapter_filename,
 )
 
 

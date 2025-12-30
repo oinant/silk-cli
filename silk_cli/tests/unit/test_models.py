@@ -4,11 +4,12 @@ Unit tests for SILK models.
 Tests SilkConfig, Chapter, ChapterGroup, and ChapterRange without IO dependencies.
 """
 
-import pytest
 from pathlib import Path
 
-from silk_cli.models.config import SilkConfig
+import pytest
+
 from silk_cli.models.chapter import Chapter, ChapterGroup, ChapterRange
+from silk_cli.models.config import SilkConfig
 
 
 class TestSilkConfig:
@@ -145,9 +146,18 @@ class TestChapterGroup:
     def test_multipart_chapter_group(self):
         """Test group with multiple parts."""
         chapters = [
-            Chapter(number=2, path=Path("/test/Ch02.md"), title="Test", content="Part 0", word_count=500),
-            Chapter(number=2, path=Path("/test/Ch02-1.md"), title="Test", content="Part 1", word_count=600, is_part=True, part_number=1),
-            Chapter(number=2, path=Path("/test/Ch02-2.md"), title="Test", content="Part 2", word_count=400, is_part=True, part_number=2),
+            Chapter(
+                number=2, path=Path("/test/Ch02.md"),
+                title="Test", content="Part 0", word_count=500
+            ),
+            Chapter(
+                number=2, path=Path("/test/Ch02-1.md"), title="Test",
+                content="Part 1", word_count=600, is_part=True, part_number=1
+            ),
+            Chapter(
+                number=2, path=Path("/test/Ch02-2.md"), title="Test",
+                content="Part 2", word_count=400, is_part=True, part_number=2
+            ),
         ]
         group = ChapterGroup(number=2, chapters=chapters)
 
@@ -158,8 +168,14 @@ class TestChapterGroup:
     def test_group_display_name(self):
         """Test display name for multipart group."""
         chapters = [
-            Chapter(number=3, path=Path("/test/Ch03.md"), title="Test", content="A", word_count=100),
-            Chapter(number=3, path=Path("/test/Ch03-1.md"), title="Test", content="B", word_count=100, is_part=True, part_number=1),
+            Chapter(
+                number=3, path=Path("/test/Ch03.md"),
+                title="Test", content="A", word_count=100
+            ),
+            Chapter(
+                number=3, path=Path("/test/Ch03-1.md"), title="Test",
+                content="B", word_count=100, is_part=True, part_number=1
+            ),
         ]
         group = ChapterGroup(number=3, chapters=chapters)
         assert group.display_name == "Ch03+"
