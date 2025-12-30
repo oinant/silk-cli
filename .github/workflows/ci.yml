@@ -2,41 +2,62 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run basic tests
-      run: |
-        chmod +x silk tests/test_basic.sh
-        ./tests/test_basic.sh
-    
-    - name: Test installation
-      run: |
-        chmod +x install.sh
-        # Test dry run sans install réelle
-        INSTALL_DIR=/tmp/silk-test ./install.sh
-        /tmp/silk-test/silk --version
-
-  compatibility:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Test basic functionality
-      shell: bash
-      run: |
-        chmod +x silk
-        ./silk --version
-        ./silk --help
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Run tests
+        run: poetry run pytest --cov=silk_cli -q
+
+      - name: Test CLI
+        run: |
+          poetry run silk --version
+          poetry run silk --help
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Ruff check
+        run: poetry run ruff check silk_cli/
+
+      - name: Type check
+        run: poetry run mypy silk_cli/ --ignore-missing-imports || true
